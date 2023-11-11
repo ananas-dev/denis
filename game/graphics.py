@@ -3,12 +3,13 @@ import numpy as np
 
 class Graphic():
 
-    def __init__(self, width, bg_color, block_color, board):
+    def __init__(self, width, bg_color_1, bg_color_2, block_color, board):
         self.board = board
         self.num_columns, self.num_rows = board.shape[1], board.shape[0]
         self.width = width
         self.height = self.width * self.num_rows / self.num_columns
-        self.bg_color = bg_color
+        self.bg_color_1 = bg_color_1
+        self.bg_color_2 = bg_color_2
         self.block_color = block_color
         self.block_width = self.width / self.num_columns
         self.block_height = self.height / self.num_rows
@@ -67,15 +68,15 @@ class Graphic():
                     pg.draw.rect(self.display, self.block_color, (col * self.block_width, row * self.block_height, self.block_width, self.block_height), 0)
 
     def draw(self):
-        self.fill_gradient(self.display, self.bg_color, (0, 0, 0))
+        self.fill_gradient(self.display, self.bg_color_1, self.bg_color_2)
         self.draw_grid()
         self.draw_board()
         pg.display.update()
 
 
 if __name__ == "__main__":
-    board = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0]])
-    graphic = Graphic(600, (100, 100, 100), (255, 255, 255), board)
+    board = np.array([[1, 0, 0, 0, 0, 0, 0, 0, 0, 1], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0]])
+    graphic = Graphic(600, (255, 0, 0), (255, 255,0),  (255, 255, 255), board)
     graphic.draw()
     while True:
         for event in pg.event.get():
