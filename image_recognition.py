@@ -30,28 +30,35 @@ def getFrame():
 
     else: print("Aucun pixel correspondant à la couleur cible n'a été trouvé."); raise Exception()
 
+def masquageMatrix(matrix: list) -> list:
+    
+    return matrix, None
+
 def getData(frame):
 
     width, height = frame.size
     new_width = width // 2.3  # Ratio de la Info_Box / Board_Box
     
     # Extraction de la partie STATS et de la partie NEXT_PIECE
-    next_piece = frame.crop((0, (height//2)*0.75, width, height - (height // 3)))
+    next_piece = frame.crop((0, (height//2)*0.75, width // 2.25, height - (height // 3)))
     board = frame.crop((new_width, 0, width, height))
 
-    PIECE_CORRESPONDANCE = {
-        "Green": (56, 196, 79),
-        "Blue": (50, 164, 250),
-        "Orange": (255, 102, 0),
-        "Purple": (204, 84, 196),
-        "Yellow": (255, 172, 28),
-        "Red": (255, 0, 0),
-        "Gray": (153, 153, 153)
-    }
+    RGB_2_ID = {
+        (56, 196, 79): 1,
+        (50, 164, 250): 2,
+        (255, 172, 28): 3,
+        (255, 102, 0): 4,
+        (204, 84, 196): 5,
+        (153, 153, 153): 6,
+        (255, 0, 0): 7}
+    # 1 : Green   | 2 : Blue
+    # 3 : Yellow  | 4 : Orange
+    # 5 : Purple  | 6 : Gray
+    # 7 : Red
 
     # --- Récupération de la prochaine pièce. ---
     next_piece_pixels = np.array(next_piece); COLOR = None
-    for color_name, target_color in PIECE_CORRESPONDANCE.items():
+    for target_color, color_name in RGB_2_ID.items():
         # On vérifie si notre couleur se trouve dans l'array NumPY.
         mask = np.all(next_piece_pixels == np.array(target_color), axis=2)
         if np.any(mask): COLOR = color_name
@@ -81,18 +88,25 @@ def getData(frame):
             cy = cy // 2
             cp = sub_image.getpixel((cx, cy))
             
-            if cp in PIECE_CORRESPONDANCE.values():
-                row.append('1')
-            else: row.append('0')
+            row.append(RGB_2_ID.get(cp, 0))
         
-        matrix.append(row)    
+        matrix.append(row)
 
-    return matrix
+    matrix, pieceActuelle = masquageMatrix(matrix)
+    return {'Matrix': matrix,
+            'pieceActuelle': pieceActuelle,
+            'pieceSuivante': COLOR}
 
 
 
-w = getData(getFrame())
-for row in w:
-    for elem in row:
-        print(elem, end=' ')
-    print("")
+def printmatrix(mat):
+    for row in mat:
+        for elem in row:
+            print(elem, end=' ')
+        print("")
+
+"""w = getData(getFrame())
+
+printmatrix(w.get('Matrix'))
+print(f'Pièce actuelle : {w.get("pieceActuelle")}')
+print(f'Pièce suivante : {w.get("pieceSuivante")}')"""
