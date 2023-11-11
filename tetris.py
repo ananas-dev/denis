@@ -46,14 +46,14 @@ class Tetris:
         self.board = np.zeros((22, 12))
         self.score = 0
         self.game_over = False
-        self.current_piece = -1
-        self.next_piece = -1
+        self.current_piece = 0
+        self.next_piece = 0
 
     def place_pieces(self, piece, size, x, y):
         for i in range(size):
             for j in range(size):
-                if y + j < 22 and self.board[y + j][x + i] != 1 and piece[j][i] != 0:
-                    self.board[y + j][x + i] = piece[j][i]
+                if y + j < 22 and self.board[y + j][x + i] == 0 and piece[j][i] != 0:
+                    self.board[y + j][x + i] = piece[j][i] * self.current_piece
 
     def check_lines(self):
         clear_count = 0
@@ -75,16 +75,21 @@ class Tetris:
                 self.score += 20
 
     def next_pos(self):
-        self.current_piece = random.randint(0, 6)
-        self.next_piece = random.randint(0, 6)
+        self.next_piece = random.randint(1, 7)
+
+        if self.next_piece == 0:
+            self.current_piece = random.randint(1, 7)
+        else:
+            self.current_piece = self.next_piece
+
                 
     def play(self, rot, col):
-        piece = np.rot90(pieces[self.current_piece], rot)
-        size = len(pieces[self.current_piece])
+        piece = np.rot90(pieces[self.current_piece - 1], rot)
+        size = len(pieces[self.current_piece - 1])
 
         # Place the piece
-        for y in range(0, 24 - size):
-            if y == 23 - size:
+        for y in range(0, 23 - size):
+            if y == 22 - size:
                 self.place_pieces(piece, size, col, y)
                 self.check_lines()
                 return
@@ -107,6 +112,10 @@ class Tetris:
 
 if __name__ == "__main__":
     t = Tetris()
+    t.next_pos()
+    t.play(1, 1)
+    t.print()
+
     graphic = graphics.Graphic(300, (64, 201, 255), (232, 28, 255), (255, 255, 255), t.board)
     graphic.draw()
     while True:
