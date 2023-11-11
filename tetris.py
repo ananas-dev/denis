@@ -87,6 +87,10 @@ class Tetris:
         piece = np.rot90(pieces[self.current_piece - 1], rot)
         size = len(pieces[self.current_piece - 1])
 
+        if col + size > 12:
+            self.game_over = True
+            return
+
         # Place the piece
         for y in range(0, 23 - size):
             if y == 22 - size:
@@ -113,7 +117,7 @@ class Tetris:
 if __name__ == "__main__":
     t = Tetris()
     t.next_pos()
-    t.play(1, 1)
+    t.play(1, 10)
     t.print()
 
     graphic = graphics.Graphic(300, (64, 201, 255), (232, 28, 255), (255, 255, 255), t.board)
