@@ -1,23 +1,18 @@
 import pygame as pg
 import numpy as np
-import imgui
 
 class Graphic():
 
     def __init__(self, width, bg_color, block_color, board):
         self.board = board
-        self.num_columns = board.shape[0]
-        self.num_rows = board.shape[1]
-        self.ratio = board.shape[0] / board.shape[1]
+        self.num_columns, self.num_rows = board.shape[1], board.shape[0]
         self.width = width
-        self.height = int(width / self.ratio)
-        self.block_size = int(self.width / board.shape[0])
+        self.height = self.width * self.num_rows / self.num_columns
         self.bg_color = bg_color
         self.block_color = block_color
-        pg.init()
-        pg.display.set_caption("Tetris")
+        self.block_width = self.width / self.num_columns
+        self.block_height = self.height / self.num_rows
         self.display = pg.display.set_mode((self.width, self.height))
-
 
 
     def fill_gradient(self, surface, color, gradient, rect=None, vertical=True, forward=True):
@@ -61,28 +56,26 @@ class Graphic():
 
 
     def draw_grid(self):
-        for i in range(self.num_columns):
-            pg.draw.line(self.display, self.block_color, (i * self.block_size, 0), (i * self.block_size, self.height))
-
-        for i in range(self.num_rows):
-            pg.draw.line(self.display, self.block_color, (0, i * self.block_size), (self.width, i * self.block_size))
+        for row in range(self.num_rows):
+            for col in range(self.num_columns):
+                pg.draw.rect(self.display, self.block_color, (col * self.block_width, row * self.block_height, self.block_width, self.block_height), 1)
 
     def draw_board(self):
-        for i in range(self.num_columns):
-            for j in range(self.num_rows):
-                if self.board[i][j] == 1:
-                    pg.draw.rect(self.display, self.block_color, (i * self.block_size, j * self.block_size, self.block_size, self.block_size))
+        for row in range(self.num_rows):
+            for col in range(self.num_columns):
+                if self.board[row][col] == 1:
+                    pg.draw.rect(self.display, self.block_color, (col * self.block_width, row * self.block_height, self.block_width, self.block_height), 0)
 
     def draw(self):
-        self.fill_gradient(self.display, self.bg_color, (0, 0, 0), vertical=True, forward=True)
+        self.fill_gradient(self.display, self.bg_color, (0, 0, 0))
         self.draw_grid()
         self.draw_board()
         pg.display.update()
 
 
 if __name__ == "__main__":
-    board = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0]])
-    graphic = Graphic(200, (100, 100, 100), (255, 255, 255), board)
+    board = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0]])
+    graphic = Graphic(600, (100, 100, 100), (255, 255, 255), board)
     graphic.draw()
     while True:
         for event in pg.event.get():
