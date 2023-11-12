@@ -3,14 +3,27 @@ import numpy as np
 import pyautogui
 from neat_tetris import load_genome, neat_command
 
+def playMove(col: int, rotate: int, piece_t: int):
+    offset = 0
 
-def playMove(move, rotate: int):
-    if move > 0:
-        for _ in range(move): pyautogui.press('right')
-    elif move < 0:
-        for _ in range(move * -1): pyautogui.press('left')
-    else: pass
+    if piece_t == 6:
+        offset = 5 - col
+    elif piece_t == 7:
+        if rotate == 0 or rotate == 2:
+            offset = 4 - col
+        if rotate == 1 or rotate == 3:
+            offset = 5 - col
+    else:
+        if rotate == 3:
+            offset = 5 - col
+
     for _ in range(rotate): pyautogui.press('up')
+
+    if offset < 0:
+        for _ in range(offset): pyautogui.press('right')
+    elif offset > 0:
+        for _ in range(offset): pyautogui.press('left')
+
     pyautogui.press('space')
  
 def main():
@@ -38,7 +51,7 @@ def main():
             # Génération du meilleur coup selon l'AI <net>
             commands = neat_command(pieceActuelle, pieceSuivante, gameMatrix, net)
             # Format : [Turns, Row]
-            playMove(5 - commands[1], commands[0])  # On joue le coup suggéré
+            playMove(commands[1], commands[0], pieceActuelle)  # On joue le coup suggéré
 
         prev_iteration = iteration  # On update l'ancienne itération. >___<"
     
