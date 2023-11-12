@@ -2,8 +2,10 @@ from image_recognition import getData
 import numpy as np
 import pyautogui
 from neat_tetris import load_genome, neat_command
+import time
 
 def playMove(col: int, rotate: int, piece_t: int):
+    
     offset = 0
 
     if piece_t == 6:
@@ -54,13 +56,25 @@ def main():
             # Génération du meilleur coup selon l'AI <net>
             commands = neat_command(pieceActuelle, pieceSuivante, gameMatrix, net)
             # Format : [Turns, Row]
-            print(f'Colonne : {commands[1]} ({commands[0]} rotations).')
-            playMove(commands[1], commands[0], pieceActuelle)  # On joue le coup suggéré
+            # print(f'Colonne : {commands[1]} ({commands[0]} rotations).')
+            if commands == (None, None):
+                time.sleep(0.5)
+                pyautogui.write("Denis")
+                time.sleep(0.5)
+                pyautogui.press("enter")
+                time.sleep(0.5)
+                pyautogui.press("n")
+                time.sleep(0.1)
+                pyautogui.press("enter")
+                continue
 
+                
+
+            playMove(commands[1], commands[0], pieceActuelle)  # On joue le coup suggéré
         prev_iteration = iteration  # On update l'ancienne itération. >___<"
     
 
 if __name__ == '__main__': 
-    # Faster inputs (.01 delay is fine it seems)
-    pyautogui.PAUSE = 0.01 
+    # Faster inputs (.001 delay is fine it seems)
+    pyautogui.PAUSE = 0.001 
     main()  # Main execution

@@ -167,6 +167,8 @@ def load_genome(genome_path):
         return net
 
 def neat_command(current_block, next_block, game_board, net):
+    if current_block == None:
+        return (None, None)
 
     t = tetris.Tetris(board=np.array(game_board), current_piece=current_block, next_piece=next_block)
     
