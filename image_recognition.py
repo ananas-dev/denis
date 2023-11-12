@@ -98,10 +98,12 @@ def masquageMatrix(matrix: list) -> list:
     flying = findFloating(matrix)
     # On récupère la couleur de la pièce avant
     # de masquer.
-    flying_piece_type = matrix[flying[0][1]][flying[0][0]]
-    for _x, _y in flying:
-        matrix[_y][_x] = 0
-    return flying_piece_type
+    if flying:
+        flying_piece_type = matrix[flying[0][1]][flying[0][0]]
+        for _x, _y in flying:
+            matrix[_y][_x] = 0
+        return flying_piece_type
+    else: return None
 
 def getData():
 
@@ -169,8 +171,9 @@ def getData():
             'pieceSuivante': COLOR}
 
 
+
 """
-time.sleep(3)
+t1 = time.time()
 w = getData()
 for row in w.get('Matrix'):
     print(row)
