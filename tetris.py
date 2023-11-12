@@ -35,101 +35,94 @@ PIECES = [
 ]
 
 class Tetris:
-    def __init__(self):
-        self.board = np.zeros((22, 12))
-        self.score = 0
-        self.game_over = False
-        self.current_piece = 0
-        self.next_piece = 0
-        self.old_max_height = 0
-        self.max_height = 0
+    def __init__(
+            self,
+            board=np.zeros((22, 12)),
+            score = 0,
+            game_over = False,
+            current_piece=random.randint(1, 7),
+            next_piece=random.randint(1, 7)):
+        self.board = board
+        self.score = score
+        self.game_over = game_over
+        self.current_piece = current_piece
+        self.next_piece = next_piece
 
+    def gen_legal_moves(self):
+        legal_moves = []
+        for rot in range(0, 4):
+            piece = np.rot90(PIECES[self.current_piece - 1], rot)
+            _, size_x = piece.shape
+            for col in range(0, 13 - size_x):
+                legal_moves.append((rot, col))
+
+        return legal_moves
+    
     def place_pieces(self, piece, size_x, size_y, x, y):
+        new_board = self.board.copy()
         for i in range(size_x):
             for j in range(size_y):
-                if self.board[y + j][x + i] == 0 and piece[j][i] != 0:
-                    self.board[y + j][x + i] = piece[j][i] * self.current_piece
+                if new_board[y + j][x + i] == 0 and piece[j][i] != 0:
+                    new_board[y + j][x + i] = piece[j][i] * self.current_piece
 
-    def check_lines(self):
         clear_count = 0
 
         for y in range(22):
-            if np.all(self.board[y] != 0):
-                self.board[1:y+1] = self.board[0:y]
-                self.board[0] = 0
+            if np.all(new_board[y] != 0):
+                new_board[1:y+1] = new_board[0:y]
+                new_board[0] = 0
                 clear_count += 1
 
-        self.max_height -= clear_count
+        return new_board
 
-        match clear_count:
-            case 1:
-                self.score += 100
-            case 2:
-                self.score += 200
-            case 3:
-                self.score += 400
-            case 4:
-                self.score += 2000
+    # def next_pos(self):
+    #     self.next_piece = random.randint(1, 7)
 
-    def next_pos(self):
-        self.next_piece = random.randint(1, 7)
+    #     if self.next_piece == 0:
+    #         self.current_piece = random.randint(1, 7)
+    #     else:
+    #         self.current_piece = self.next_piece
 
-        if self.next_piece == 0:
-            self.current_piece = random.randint(1, 7)
-        else:
-            self.current_piece = self.next_piece
-                
-    def play(self, rot, col):
+    def height_muliplier(self):
+        res = 0
+        for i, row in enumerate(self.board):
+            for val in row:
+                if val != 0:
+                    penalty += 22 - i
+
+        return res
+
+    def holes(self):
+        res = 0
+
+    def apply_move(self, rot, col):
         piece = np.rot90(PIECES[self.current_piece - 1], rot)
         size_y, size_x = piece.shape
 
-        # Quick out of bound check
-        if col + size_x > 12:
-            col = 12 - size_x
-            self.score -= 10000
-
-        # Place the piece
         for y in range(0, 23 - size_y):
             if y == 22 - size_y:
-                self.place_pieces(piece, size_x, size_y, col, y)
-                self.max_height = max(size_y, self.max_height)
-                self.check_lines()
-                return
+                new_board = self.place_pieces(piece, size_x, size_y, col, y)
+                return Tetris(new_board, self.score, self.game_over, current_piece=self.next_piece, next_piece=0)
 
             for i in range(size_x):
                 for j in range(size_y):
                     if col + i < 12 and piece[j][i] != 0 and self.board[j + y + 1][i + col] != 0:
-                        self.place_pieces(piece, size_x, size_y, col, y)
+                        new_board = self.place_pieces(piece, size_x, size_y, col, y)
 
-                        if np.any(self.board[0] != 0):
+                        if np.any(new_board[0] != 0):
                             self.game_over = True
-                            return
 
-                        self.max_height = max((22 - y) + size_y, self.max_height)
-
-                        self.check_lines()
-
-                        return
-            
-            if self.max_height > self.old_max_height:
-                self.score -= (self.max_height - self.old_max_height) * int(np.exp(self.max_height) * 0.001) 
-
-            self.old_max_height = self.max_height
-            self.score += 10
-
-
+                        return Tetris(new_board, self.score, self.game_over, current_piece=self.next_piece, next_piece=0)
+                
     def print(self):
         print(self.board)
 
 if __name__ == "__main__":
+    t0 = Tetris()
 
-    while True:
-        t = Tetris()
+    for rot0, col0 in t0.gen_legal_moves():
+        t1 = t0.apply_move(rot0, col0)
+        for rot1, col1 in t1.gen_legal_moves():
+            t2 = t1.apply_move(rot1, col1)
+            t2.print()
 
-        while not t.game_over:
-            t.next_pos()
-            t.play(random.randint(0, 3), random.randint(0, 8))
-            t.print()
-
-        if t.score != 0:
-            print(t.score)
