@@ -75,7 +75,7 @@ class Tetris:
         new_score += clear_count * 1000
         return new_board, new_score
 
-    def height_muliplier(self):
+    def height_multiplier(self):
         res = 0
         for i, row in enumerate(self.board):
             for val in row:
