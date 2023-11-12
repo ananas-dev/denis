@@ -15,11 +15,11 @@ train = False
 ##########################
 ### NEAT CONFIGURATION ###
 
-pop_size = 1000
+pop_size = 10
 fitness_threshold = 1000
-num_inputs = 7  # 7 inputs : height multiplier, blockades, hole, clear, ...
+num_inputs = 3  # 7 inputs : height multiplier, blockades, hole, clear, ...
 num_outputs = 1 # Score based on the 7 inputs
-num_generations = 10000
+num_generations = 1
 
 ##########################
 ##########################
@@ -121,9 +121,39 @@ def eval_genomes(genomes, config):
         #     t.next_pos() 
 
         for i, t in enumerate(games):
-            positions = t.get_positions()
-            for pos in positions:
-                pass
+            best_board = None
+
+            max1_score = float("-inf")
+            for rot0, col0 in t.gen_legal_moves():
+                game_over, t1 = t.apply_move(rot0, col0)
+                if game_over: continue
+
+                max2_score = float("-inf")
+                for rot1, col1 in t1.gen_legal_moves():
+                    game_over, t2 = t1.apply_move(rot1, col1, leaf=True)
+                    if game_over: continue
+                    t2_score = nets[i].activate((t2.height_multiplier(), t2.get_cleared(), t2.holes()))[0]
+                    if t2_score > max2_score:
+                        max2_score = t2_score
+
+                if max2_score > max1_score:
+                    max1_score = max2_score
+                    best_board = t1
+            
+            if best_board is not None:
+                games[i] = best_board
+                ge[i].fitness = best_board.score
+            else:
+                games.pop(i)
+                ge.pop(i)
+                nets.pop(i)
+
+            if len(games) == 0:
+                return
+            
+        print("Population left : ", len(games))
+            
+            
 
 
 def load_genome(genome_path):
@@ -145,23 +175,33 @@ def neat_command(current_block, next_block, game_board, net):
             
 
 ### RUN FUNCTION ###
-def run(config_file):
+def run(config_file, retrain=False):
     global p
-    # Load configuration.
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                         config_file)
+    if not retrain:
+        # Load configuration.
+        config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                            neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                            config_file)
+        
+        p = neat.Population(config) # Creates the population
     
-    p = neat.Population(config) # Creates the population
+    else:
+        checkpoints_filenames = [filename for filename in os.listdir(".") if filename.startswith("neat-checkpoint-")]
+        checkpoints_filenames.sort()
+        filename = checkpoints_filenames[-1]
+        p = neat.Checkpointer.restore_checkpoint(filename)
+    
+    p.add_reporter(neat.StdOutReporter(True))
+    p.add_reporter(neat.StatisticsReporter())
+    p.add_reporter(neat.Checkpointer(1, None)) # Saves the model every generation
     winner = p.run(eval_genomes, num_generations) # Runs the population until the fitness threshold is reached
-    with open("winner.pkl", "wb") as f:
-        pickle.dump(winner, f)
-        f.close()
+    pickle.dump(winner, open('winner.pkl', 'wb')) # Saves the best genome
+    
 
 
 
 if __name__ == "__main__":
-
+    modify_config_file()
     # Tests on a game
     if not train: 
         config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
@@ -173,27 +213,45 @@ if __name__ == "__main__":
         net = neat.nn.FeedForwardNetwork.create(genome, config)
         # Tests the best genome on a test game
         clock = pg.time.Clock()
+        t = tetris.Tetris()
+        graphic = graphics.Graphic(300, (64, 201, 255), (232, 28, 255), (255, 255, 255), t.board)
         while True:
-            t = tetris.Tetris()
-            graphic = graphics.Graphic(300, (64, 201, 255), (232, 28, 255), (255, 255, 255), t.board)
-            while not t.game_over:
-                for event in pg.event.get():
-                    if event.type == pg.QUIT:
-                        pg.quit()
-                        quit()
-
-                state = t.board
-                current_block = t.current_piece
-                next_block = t.next_piece
-                commands = net.activate((current_block, next_block, *flatten_matrix(state)))
-                commands = convert_command(commands, 12)
-                t.next_pos()
-                t.play(*commands)
-                graphic.draw()
-                clock.tick(5)
             
-            print("Game Over \tScore : ", t.score)
+            best_move = (None, None)
+            max1_score = float("-inf")
+            for rot0, col0 in t.gen_legal_moves():
+                game_over, t1 = t.apply_move(rot0, col0)
+                if game_over: continue
+
+                max2_score = float("-inf")
+                for rot1, col1 in t1.gen_legal_moves():
+                    game_over, t2 = t1.apply_move(rot1, col1, leaf=True)
+                    if game_over: continue
+                    t2_score = net.activate((t2.height_multiplier(), t2.get_cleared(), t2.holes()))[0]
+                    if t2_score > max2_score:
+                        max2_score = t2_score
+
+                if max2_score > max1_score:
+                    max1_score = max2_score
+                    best_move = (rot0, col0)
+
+            if best_move is not (None, None):
+                game_over, t = t.apply_move(*best_move)
+
+            graphic.board = t.board
+            graphic.draw()
+            if game_over:
+                break
+
+        while True:
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    pg.quit()
+
+            graphic.draw()
+            
+
 
     # Trains the model
     else:
-        run("config.txt")
+        run("config.txt", retrain=True)
