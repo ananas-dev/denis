@@ -1,7 +1,5 @@
 import numpy as np
-import pygame as pg
 import random
-import graphics
 import time
 
 PIECES = [
@@ -58,6 +56,8 @@ class Tetris:
     
     def place_pieces(self, piece, size_x, size_y, x, y):
         new_board = self.board.copy()
+        new_score = self.score
+
         for i in range(size_x):
             for j in range(size_y):
                 if new_board[y + j][x + i] == 0 and piece[j][i] != 0:
@@ -71,18 +71,23 @@ class Tetris:
                 new_board[0] = 0
                 clear_count += 1
 
-        return new_board
+
+        new_score += clear_count * 1000
+        return new_board, new_score
 
     def height_muliplier(self):
         res = 0
         for i, row in enumerate(self.board):
             for val in row:
                 if val != 0:
-                    penalty += 22 - i
+                    res += 22 - i
 
         return res
 
     def holes(self):
+        res = 0
+
+    def blocades(self):
         res = 0
 
     # (int, int, bool) => game_over, new_leaf
@@ -99,23 +104,25 @@ class Tetris:
 
         for y in range(0, 23 - size_y):
             if y == 22 - size_y:
-                new_board = self.place_pieces(piece, size_x, size_y, col, y)
-                return False, Tetris(new_board, self.score, self.next_piece, next_piece)
+                new_board, new_score = self.place_pieces(piece, size_x, size_y, col, y)
+                return False, Tetris(new_board, new_score, self.next_piece, next_piece)
 
             for i in range(size_x):
                 for j in range(size_y):
                     if col + i < 12 and piece[j][i] != 0 and self.board[j + y + 1][i + col] != 0:
-                        new_board = self.place_pieces(piece, size_x, size_y, col, y)
+                        new_board, new_score = self.place_pieces(piece, size_x, size_y, col, y)
 
                         if np.any(new_board[0] != 0):
                             return True, None
 
-                        return False, Tetris(new_board, self.score, self.next_piece, next_piece)
+                        return False, Tetris(new_board, new_score, self.next_piece, next_piece)
                 
     def print(self):
         print(self.board)
 
 if __name__ == "__main__":
+    time_1 = time.time()
+
     t0 = Tetris()
 
     for rot0, col0 in t0.gen_legal_moves():
@@ -124,7 +131,12 @@ if __name__ == "__main__":
             exit()
         for rot1, col1 in t1.gen_legal_moves():
             game_over, t2 = t1.apply_move(rot1, col1, leaf=True)
+            t2.height_muliplier()
             if game_over:
                 exit()
-            t2.print()
+            # t2.print()
+
+    time_2 = time.time()
+
+    print(time_2 - time_1)
 
