@@ -1,6 +1,7 @@
 import pyautogui
 import numpy as np
 from PIL import Image
+import time
 
 
 def isFloating(matrix, forme):
@@ -102,7 +103,9 @@ def masquageMatrix(matrix: list) -> list:
         matrix[_y][_x] = 0
     return flying_piece_type
 
-def getData(frame):
+def getData():
+
+    frame = getFrame()  # Récupération de l'image (pyautogui duh)
 
     width, height = frame.size
     new_width = width // 2.3  # Ratio de la Info_Box / Board_Box
@@ -155,7 +158,6 @@ def getData(frame):
             cx = cx // 2
             cy = cy // 2
             cp = sub_image.getpixel((cx, cy))
-            
             row.append(RGB_2_ID.get(cp, 0))
         
         matrix.append(row)
@@ -165,3 +167,13 @@ def getData(frame):
     return {'Matrix': matrix,
             'pieceActuelle': pieceActuelle,
             'pieceSuivante': COLOR}
+
+
+"""
+time.sleep(3)
+w = getData()
+for row in w.get('Matrix'):
+    print(row)
+print(f'Pièce Actuelle : {w.get("pieceActuelle")}')
+print(f'Pièce Suivante : {w.get("pieceSuivante")}')
+"""
