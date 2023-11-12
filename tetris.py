@@ -127,12 +127,6 @@ class Tetris:
 
         return holes, blocades, height
 
-    def get_cleared(self):
-        return self.cleared
-
-    def blocades(self):
-        res = 0
-
     # (int, int, bool) => game_over, new_leaf
     def apply_move(self, rot, col, gen_next_piece=False):
         # Avoid some costs
