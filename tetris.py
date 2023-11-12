@@ -1,6 +1,9 @@
 import numpy as np
+import pygame as pg
 import random
 import time
+
+from graphics import Graphic
 
 # Antoine's special
 def getAmas(matrix, x, y):
@@ -103,23 +106,36 @@ class Tetris:
 
         return res
 
-    def holes(self):
-        formes = []
-        already_visited = []
+    def get_stats(self):
+        holes = 0
+        blocades = 0
+        height = 0
+        height_mul = 0
 
-        for y, row in enumerate(self.board):
-            for x, elem in enumerate(row):
-            
-                # Nouvelle pièce à ajouter à la collection
-                if elem == 0 and (x, y) not in already_visited:
-                    w = getAmas(self.board, x, y)  # Forme W enregistrée.
-                    # On voudrait éviter de refaire un traitement pour une case
-                    # qui appartient à W, parce que ça ferait exactement la même forme.
-                    for coord in w:
-                        already_visited.append(coord)
-                    formes.append(w)
-        
-        return (len(formes) - 1)
+        for i in range(12):
+            height_mul = 0
+            for j in range(1, 22):
+                height_mul += 1
+
+                if self.board[j][i] != 0:
+                    height += height_mul
+
+                if self.board[j-1][i] != 0 and self.board[j][i] == 0:
+                    holes += 1
+                    blocades += 1
+
+                    k = 1
+                    l = 1
+
+                    while j - k >= 0 and self.board[j-k][i] != 0:
+                        blocades += 1
+                        k += 1
+
+                    while j + l < 22 and self.board[j+l][i] == 0:
+                        holes += 1
+                        l += 1
+
+        return holes, blocades, height
 
     def get_cleared(self):
         return self.cleared
@@ -128,12 +144,12 @@ class Tetris:
         res = 0
 
     # (int, int, bool) => game_over, new_leaf
-    def apply_move(self, rot, col, leaf=False):
+    def apply_move(self, rot, col, gen_next_piece=False):
         # Avoid some costs
-        if leaf:
-            next_piece = 0
-        else:
+        if gen_next_piece:
             next_piece = random.randint(1, 7)
+        else:
+            next_piece = 0
 
 
         piece = np.rot90(PIECES[self.current_piece - 1], rot)
@@ -158,22 +174,28 @@ class Tetris:
         print(self.board)
 
 if __name__ == "__main__":
-    time_1 = time.time()
+    t = Tetris()
 
-    t0 = Tetris()
+    for _ in range(20):
+        move = random.choice(t.gen_legal_moves())
+        game_over, t = t.apply_move(*move)
 
-    for rot0, col0 in t0.gen_legal_moves():
-        game_over, t1 = t0.apply_move(rot0, col0)
         if game_over:
-            exit()
-        for rot1, col1 in t1.gen_legal_moves():
-            game_over, t2 = t1.apply_move(rot1, col1, leaf=True)
-            t2.height_multiplier()
-            if game_over:
-                exit()
-            # t2.print()
+            break
 
-    time_2 = time.time()
+    
+    holes, blocades, height = t.get_stats()
 
-    print(time_2 - time_1)
+    print("Holes:", holes)
+    print("Blocades:", blocades)
+    print("Height:", height)
+
+    graphic = Graphic(400, (0, 0, 0), (0, 0, 0),  (255, 255, 255), t.board)
+    graphic.draw()
+    while True:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                quit()
+
 
