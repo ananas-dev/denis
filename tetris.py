@@ -5,25 +5,6 @@ import time
 
 from graphics import Graphic
 
-# Antoine's special
-def getAmas(matrix, x, y):
-    target_num = matrix[y][x]
-    rows = len(matrix)
-    cols = len(matrix[0])
-    visited = [[False] * cols for _ in range(rows)]
-    
-    def dfs(x, y):
-        if x < 0 or x >= cols or y < 0 or y >= rows or visited[y][x] or matrix[y][x] != target_num:
-            return []
-        visited[y][x] = True
-        coordinates = [(x, y)]
-        for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-            next_x, next_y = x + dx, y + dy
-            coordinates += dfs(next_x, next_y)
-        return coordinates
-
-    return dfs(x, y)
-
 PIECES = [
     [
         [0,0,1],
@@ -94,7 +75,7 @@ class Tetris:
                 new_board[0] = 0
                 clear_count += 1
 
-        if y < 5:
+        if y < 5 - size_y:
             self.score -= 500
 
         return new_board, self.score + clear_count * 1000, self.cleared + clear_count
