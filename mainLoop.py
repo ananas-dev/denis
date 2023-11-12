@@ -12,7 +12,7 @@ def playMove(move, rotate: int):
     else: pass
     for _ in range(rotate): pyautogui.press('up')
     pyautogui.press('space')
-
+ 
 def main():
 
     net = load_genome("winner.pkl")
@@ -34,16 +34,16 @@ def main():
         if not np.all(difference == 0):
             # On doit jouer un coup avec les data de Frame.
             pieceActuelle, pieceSuivante, gameMatrix = frame.get('pieceActuelle'), frame.get('pieceSuivante'), frame.get('Matrix')
-            
+                
             # Génération du meilleur coup selon l'AI <net>
             commands = neat_command(pieceActuelle, pieceSuivante, gameMatrix, net)
             # Format : [Turns, Row]
             playMove(5 - commands[1], commands[0])  # On joue le coup suggéré
 
         prev_iteration = iteration  # On update l'ancienne itération. >___<"
+    
 
-
-if __name__ == '__main__':
+if __name__ == '__main__': 
     # Faster inputs (.01 delay is fine it seems)
-    pyautogui.PAUSE = 0.01
+    pyautogui.PAUSE = 0.01 
     main()  # Main execution
