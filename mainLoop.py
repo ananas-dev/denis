@@ -7,24 +7,26 @@ def playMove(col: int, rotate: int, piece_t: int):
     offset = 0
 
     if piece_t == 6:
-        offset = 5 - col
+        offset = col - 5
     elif piece_t == 7:
         if rotate == 0 or rotate == 2:
-            offset = 4 - col
-        if rotate == 1 or rotate == 3:
-            offset = 5 - col
+            offset = col - 4
+        elif rotate == 1:
+            offset = col - 5
+        elif rotate == 3:
+            offset = col - 6
     else:
         if rotate == 3:
-            offset = 5 - col
+            offset = col - 5
         else:
-            offset = 4 - col
+            offset = col - 4
 
     for _ in range(rotate): pyautogui.press('up')
 
     if offset < 0:
-        for _ in range(offset): pyautogui.press('right')
+        for _ in range(abs(offset)): pyautogui.press('left')
     elif offset > 0:
-        for _ in range(offset): pyautogui.press('left')
+        for _ in range(abs(offset)): pyautogui.press('right')
 
     pyautogui.press('space')
  
@@ -52,6 +54,7 @@ def main():
             # Génération du meilleur coup selon l'AI <net>
             commands = neat_command(pieceActuelle, pieceSuivante, gameMatrix, net)
             # Format : [Turns, Row]
+            print(f'Colonne : {commands[1]} ({commands[0]} rotations).')
             playMove(commands[1], commands[0], pieceActuelle)  # On joue le coup suggéré
 
         prev_iteration = iteration  # On update l'ancienne itération. >___<"
