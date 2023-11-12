@@ -1,7 +1,6 @@
 import pyautogui
 import numpy as np
 from PIL import Image
-import time
 
 
 def isFloating(matrix, forme):
@@ -175,11 +174,9 @@ def getData():
 
 
 
-"""
-t1 = time.time()
-w = getData()
-for row in w.get('Matrix'):
-    print(row)
-print(f'Pièce Actuelle : {w.get("pieceActuelle")}')
-print(f'Pièce Suivante : {w.get("pieceSuivante")}')
-"""
+if __name__ == '__main__':
+    w = getData()
+    for row in w.get('Matrix'):
+        print(row)
+    print(f'Pièce Actuelle : {w.get("pieceActuelle")}')
+    print(f'Pièce Suivante : {w.get("pieceSuivante")}')
