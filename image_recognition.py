@@ -1,8 +1,70 @@
 import pyautogui
 import numpy as np
 from PIL import Image
-import time
 
+
+def isFloating(matrix, forme):
+    
+    linear_coords = {}
+    
+    for x, y in forme:
+        if x in linear_coords:
+            linear_coords[x] = max(linear_coords[x], y)
+        else:
+            linear_coords[x] = y
+    
+    w = [(x, y) for x, y in linear_coords.items()]
+    
+    floating = True
+
+    for subcoord in w:
+        try:
+            if matrix[subcoord[1]+1][subcoord[0]] == 0:
+                pass
+            else: floating = False
+        except: floating = False
+    return floating
+
+def findFloating(matrix: list) -> list:
+    
+    formes = []
+    already_visited = []
+    flying = None
+
+    for y, row in enumerate(matrix):
+        for x, elem in enumerate(row):
+        
+            # Nouvelle pièce à ajouter à la collection
+            if elem != 0 and (x, y) not in already_visited:
+                w = getPiece(matrix, x, y)  # Forme W enregistrée.
+                # On voudrait éviter de refaire un traitement pour une case
+                # qui appartient à W, parce que ça ferait exactement la même forme.
+                for coord in w:
+                    already_visited.append(coord)
+                formes.append(w)
+
+                if isFloating(matrix, w):
+                    return w
+    
+    return None
+
+def getPiece(matrix, x, y):
+    target_num = matrix[y][x]
+    rows = len(matrix)
+    cols = len(matrix[0])
+    visited = [[False] * cols for _ in range(rows)]
+    
+    def dfs(x, y):
+        if x < 0 or x >= cols or y < 0 or y >= rows or visited[y][x] or matrix[y][x] != target_num:
+            return []
+        visited[y][x] = True
+        coordinates = [(x, y)]
+        for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+            next_x, next_y = x + dx, y + dy
+            coordinates += dfs(next_x, next_y)
+        return coordinates
+
+    return dfs(x, y)
 
 def getFrame():
 
@@ -32,7 +94,13 @@ def getFrame():
 
 def masquageMatrix(matrix: list) -> list:
     
-    return matrix, None
+    flying = findFloating(matrix)
+    # On récupère la couleur de la pièce avant
+    # de masquer.
+    flying_piece_type = matrix[flying[0][1]][flying[0][0]]
+    for _x, _y in flying:
+        matrix[_y][_x] = 0
+    return flying_piece_type
 
 def getData(frame):
 
@@ -92,21 +160,8 @@ def getData(frame):
         
         matrix.append(row)
 
-    matrix, pieceActuelle = masquageMatrix(matrix)
+    pieceActuelle = masquageMatrix(matrix)
+
     return {'Matrix': matrix,
             'pieceActuelle': pieceActuelle,
             'pieceSuivante': COLOR}
-
-
-
-def printmatrix(mat):
-    for row in mat:
-        for elem in row:
-            print(elem, end=' ')
-        print("")
-
-"""w = getData(getFrame())
-
-printmatrix(w.get('Matrix'))
-print(f'Pièce actuelle : {w.get("pieceActuelle")}')
-print(f'Pièce suivante : {w.get("pieceSuivante")}')"""
