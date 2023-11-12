@@ -17,9 +17,9 @@ train = False
 
 pop_size = 10
 fitness_threshold = 1000
-num_inputs = 3  # 7 inputs : height multiplier, blockades, hole, clear, ...
+num_inputs = 4  # 7 inputs : height multiplier, blockades, hole, clear, ...
 num_outputs = 1 # Score based on the 7 inputs
-num_generations = 1
+num_generations = 10
 
 ##########################
 ##########################
@@ -125,14 +125,14 @@ def eval_genomes(genomes, config):
 
             max1_score = float("-inf")
             for rot0, col0 in t.gen_legal_moves():
-                game_over, t1 = t.apply_move(rot0, col0)
+                game_over, t1 = t.apply_move(rot0, col0, gen_next_piece=True)
                 if game_over: continue
 
                 max2_score = float("-inf")
                 for rot1, col1 in t1.gen_legal_moves():
-                    game_over, t2 = t1.apply_move(rot1, col1, leaf=True)
+                    game_over, t2 = t1.apply_move(rot1, col1)
                     if game_over: continue
-                    t2_score = nets[i].activate((t2.height_multiplier(), t2.get_cleared(), t2.holes()))[0]
+                    t2_score = nets[i].activate((t2.get_cleared() ,*t2.get_stats()))[0]
                     if t2_score > max2_score:
                         max2_score = t2_score
 
@@ -140,7 +140,7 @@ def eval_genomes(genomes, config):
                     max1_score = max2_score
                     best_board = t1
             
-            if best_board is not None:
+            if best_board != None:
                 games[i] = best_board
                 ge[i].fitness = best_board.score
             else:
@@ -167,9 +167,29 @@ def load_genome(genome_path):
         return net
 
 def neat_command(current_block, next_block, game_board, net):
-    commands = net.activate((current_block, next_block, *flatten_matrix(game_board)))
-    commands = convert_command(commands, 12)
-    return commands
+
+    t = tetris.Tetris(board=np.array(game_board), current_piece=current_block, next_piece=next_block)
+    
+    best_move = (None, None)
+    max1_score = float("-inf")
+    for rot0, col0 in t.gen_legal_moves():
+        game_over, t1 = t.apply_move(rot0, col0)
+        if game_over: continue
+
+        max2_score = float("-inf")
+        for rot1, col1 in t1.gen_legal_moves():
+            game_over, t2 = t1.apply_move(rot1, col1)
+            if game_over: continue
+            t2_score = net.activate((t2.cleared ,*t2.get_stats()[:3]))[0]
+            if t2_score > max2_score:
+                max2_score = t2_score
+
+        if max2_score > max1_score:
+            max1_score = max2_score
+            best_move = (rot0, col0)
+
+    print("Best Move = ", best_move)
+    return best_move[0], best_move[1]
 
     
             
@@ -193,7 +213,7 @@ def run(config_file, retrain=False):
     
     p.add_reporter(neat.StdOutReporter(True))
     p.add_reporter(neat.StatisticsReporter())
-    p.add_reporter(neat.Checkpointer(1, None)) # Saves the model every generation
+    p.add_reporter(neat.Checkpointer(2, None)) # Saves the model every generation
     winner = p.run(eval_genomes, num_generations) # Runs the population until the fitness threshold is reached
     pickle.dump(winner, open('winner.pkl', 'wb')) # Saves the best genome
     
@@ -216,18 +236,18 @@ if __name__ == "__main__":
         t = tetris.Tetris()
         graphic = graphics.Graphic(300, (64, 201, 255), (232, 28, 255), (255, 255, 255), t.board)
         while True:
-            
+            clock.tick(30)
             best_move = (None, None)
             max1_score = float("-inf")
             for rot0, col0 in t.gen_legal_moves():
-                game_over, t1 = t.apply_move(rot0, col0)
+                game_over, t1 = t.apply_move(rot0, col0, gen_next_piece=True)
                 if game_over: continue
 
                 max2_score = float("-inf")
                 for rot1, col1 in t1.gen_legal_moves():
-                    game_over, t2 = t1.apply_move(rot1, col1, leaf=True)
+                    game_over, t2 = t1.apply_move(rot1, col1)
                     if game_over: continue
-                    t2_score = net.activate((t2.height_multiplier(), t2.get_cleared(), t2.holes()))[0]
+                    t2_score = net.activate((t2.cleared, *t2.get_stats()[:3]))[0]
                     if t2_score > max2_score:
                         max2_score = t2_score
 
@@ -235,13 +255,16 @@ if __name__ == "__main__":
                     max1_score = max2_score
                     best_move = (rot0, col0)
 
-            if best_move is not (None, None):
-                game_over, t = t.apply_move(*best_move)
+            if best_move != (None, None):
+                game_over, t = t.apply_move(*best_move, gen_next_piece=True)
 
             graphic.board = t.board
             graphic.draw()
             if game_over:
                 break
+        
+        print("Game over !")
+        print("Score :", t.score)
 
         while True:
             for event in pg.event.get():
@@ -254,4 +277,4 @@ if __name__ == "__main__":
 
     # Trains the model
     else:
-        run("config.txt", retrain=True)
+        run("config.txt", retrain=False)
