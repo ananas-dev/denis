@@ -91,7 +91,7 @@ def getFrame():
         region = image_np[min_x:max_x + 1, min_y:max_y + 1, :]
         return Image.fromarray(region)  # Convertir la région en une image PIL
 
-    else: print("Aucun pixel correspondant à la couleur cible n'a été trouvé."); raise Exception()
+    else: return None
 
 def masquageMatrix(matrix: list) -> list:
     
@@ -108,6 +108,9 @@ def masquageMatrix(matrix: list) -> list:
 def getData():
 
     frame = getFrame()  # Récupération de l'image (pyautogui duh)
+
+    if frame is None:
+        while frame is None: frame = getFrame()
 
     width, height = frame.size
     new_width = width // 2.3  # Ratio de la Info_Box / Board_Box
