@@ -17,7 +17,7 @@ train = False
 
 pop_size = 10
 fitness_threshold = 1000
-num_inputs = 6  
+num_inputs = 7  
 num_outputs = 1 # Score based on the 7 inputs
 num_generations = 10
 
@@ -205,6 +205,7 @@ def run(config_file, retrain=False):
         p = neat.Population(config) # Creates the population
     
     else:
+        # Load the last checkpoint
         checkpoints_filenames = [filename for filename in os.listdir(".") if filename.startswith("neat-checkpoint-")]
         checkpoints_filenames.sort()
         filename = checkpoints_filenames[-1]
@@ -212,8 +213,8 @@ def run(config_file, retrain=False):
     
     p.add_reporter(neat.StdOutReporter(True))
     p.add_reporter(neat.StatisticsReporter())
-    p.add_reporter(neat.Checkpointer(2, None)) # Saves the model every generation
-    winner = p.run(eval_genomes, num_generations) # Runs the population until the fitness threshold is reached
+    p.add_reporter(neat.Checkpointer(2, None)) # Saves the model every two generations
+    winner = p.run(eval_genomes, num_generations) # Runs the population 'number_generations' generations
     pickle.dump(winner, open('winner.pkl', 'wb')) # Saves the best genome
     
 
