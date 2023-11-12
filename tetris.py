@@ -101,13 +101,13 @@ class Tetris:
                     if i == 0 or i == 11:
                         touching_walls += 1
 
-                    if i > 0 and self.board[j][i - 1] == 0:
+                    if i > 0 and self.board[j][i - 1] != 0:
                         touching_edges += 1  # Left edge
-                    if i < 11 and self.board[j][i + 1] == 0:
+                    if i < 11 and self.board[j][i + 1] != 0:
                         touching_edges += 1  # Right edge
-                    if j > 1 and self.board[j - 1][i] == 0:
+                    if j > 1 and self.board[j - 1][i] != 0:
                         touching_edges += 1  # Top edge
-                    if j < 21 and self.board[j + 1][i] == 0:
+                    if j < 21 and self.board[j + 1][i] != 0:
                         touching_edges += 1  # Bottom edge
 
                 if self.board[j-1][i] != 0 and self.board[j][i] == 0:
@@ -168,13 +168,14 @@ if __name__ == "__main__":
             break
 
     
-    holes, blocades, height, touching_floor, touching_walls = t.get_stats()
+    holes, blocades, height, touching_floor, touching_walls, touching_edges = t.get_stats()
 
     print("Holes:", holes)
     print("Blocades:", blocades)
     print("Height:", height)
     print("Touching down:", touching_floor)
     print("Touching walls:", touching_walls)
+    print("Touching walls:", touching_edges)
 
     graphic = Graphic(400, (0, 0, 0), (0, 0, 0),  (255, 255, 255), t.board)
     graphic.draw()

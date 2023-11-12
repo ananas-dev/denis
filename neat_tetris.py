@@ -9,7 +9,7 @@ import graphics
 
 
 ### TRAINING PARAMETERS ###
-train = False
+train = True
 
 
 ##########################
@@ -19,7 +19,7 @@ pop_size = 10
 fitness_threshold = 1000
 num_inputs = 7  
 num_outputs = 1 # Score based on the 7 inputs
-num_generations = 10
+num_generations = 100
 
 ##########################
 ##########################
