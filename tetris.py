@@ -106,7 +106,7 @@ class Tetris:
 
             for i in range(size):
                 for j in range(size):
-                    if piece[j][i] != 0 and self.board[j + y + 1][i + col] != 0:
+                    if col + i < 12 and piece[j][i] != 0 and self.board[j + y + 1][i + col] != 0:
 
                         self.place_pieces(piece, size, col, y)
 
@@ -121,15 +121,18 @@ class Tetris:
         print(self.board)
 
 if __name__ == "__main__":
-    t = Tetris()
-    t.next_pos()
-    t.play(1, 10)
-    t.print()
-
-    graphic = graphics.Graphic(300, (64, 201, 255), (232, 28, 255), (255, 255, 255), t.board)
-    graphic.draw()
     while True:
-        for event in pg.event.get():
-            if event.type == pg.QUIT:
-                pg.quit()
-                quit()
+        t = Tetris()
+
+        while not t.game_over:
+            t.next_pos()
+            t.play(random.randint(0, 2), random.randint(0, 11))
+            t.print()
+
+    # graphic = graphics.Graphic(300, (64, 201, 255), (232, 28, 255), (255, 255, 255), t.board)
+    # graphic.draw()
+    # while True:
+    #      for event in pg.event.get():
+    #          if event.type == pg.QUIT:
+    #              pg.quit()
+    #              quit()
