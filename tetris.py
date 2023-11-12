@@ -41,6 +41,8 @@ class Tetris:
         self.game_over = False
         self.current_piece = 0
         self.next_piece = 0
+        self.old_max_height = 0
+        self.max_height = 0
 
     def place_pieces(self, piece, size_x, size_y, x, y):
         for i in range(size_x):
@@ -57,15 +59,17 @@ class Tetris:
                 self.board[0] = 0
                 clear_count += 1
 
+        self.max_height -= clear_count
+
         match clear_count:
             case 1:
-                self.score += 1
+                self.score += 10
             case 2:
-                self.score += 2
-            case 3:
-                self.score += 4
-            case 4:
                 self.score += 20
+            case 3:
+                self.score += 40
+            case 4:
+                self.score += 200
 
     def next_pos(self):
         self.next_piece = random.randint(1, 7)
@@ -81,13 +85,14 @@ class Tetris:
 
         # Quick out of bound check
         if col + size_x > 12:
-            self.game_over = True
-            return
+            col = 12 - size_x
+            self.score -= 100
 
         # Place the piece
         for y in range(0, 23 - size_y):
             if y == 22 - size_y:
                 self.place_pieces(piece, size_x, size_y, col, y)
+                self.max_height = max(size_y, self.max_height)
                 self.check_lines()
                 return
 
@@ -100,8 +105,17 @@ class Tetris:
                             self.game_over = True
                             return
 
+                        self.max_height = max((22 - y) + size_y, self.max_height)
+
                         self.check_lines()
+
                         return
+            
+            if self.max_height > self.old_max_height:
+                self.score -= self.max_height
+
+            self.old_max_height = self.max_height
+
 
     def print(self):
         print(self.board)
@@ -116,12 +130,5 @@ if __name__ == "__main__":
             t.play(random.randint(0, 3), random.randint(0, 8))
             t.print()
 
-    # graphic = graphics.Graphic(300, (64, 201, 255), (232, 28, 255), (255, 255, 255), t.board)
-    # graphic.draw()
-    # pg.quit()
-    # quit()
-    # while True:
-    #      for event in pg.event.get():
-    #          if event.type == pg.QUIT:
-    #              pg.quit()
-    #              quit()
+        if t.score != 0:
+            print(t.score)
