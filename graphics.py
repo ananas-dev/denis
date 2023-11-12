@@ -66,8 +66,9 @@ class Graphic():
 
     def draw_grid(self):
         for row in range(self.num_rows):
-            for col in range(self.num_columns):
-                pg.draw.rect(self.display, self.grid_color, (col * self.block_width, row * self.block_height, self.block_width, self.block_height), 1)
+            pg.draw.line(self.display, self.grid_color, (0, row * self.block_height), (self.width, row * self.block_height))
+        for col in range(self.num_columns):
+            pg.draw.line(self.display, self.grid_color, (col * self.block_width, 0), (col * self.block_width, self.height))
 
     def draw_board(self):
         for row in range(self.num_rows):
@@ -84,7 +85,7 @@ class Graphic():
 
 
 if __name__ == "__main__":
-    board = np.array([[1, 0, 0, 0, 0, 0, 0, 0, 0, 1], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0]])
+    board = np.array([[1, 0, 0, 0, 0, 0, 0, 0, 0, 3], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0]])
     graphic = Graphic(600, (255, 0, 0), (255, 255,0),  (255, 255, 255), board)
     graphic.draw()
     while True:
