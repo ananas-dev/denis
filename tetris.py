@@ -94,6 +94,8 @@ class Tetris:
                 new_board[0] = 0
                 clear_count += 1
 
+        if y < 5:
+            self.score -= 500
 
         return new_board, self.score + clear_count * 1000, self.cleared + clear_count
 
@@ -104,6 +106,7 @@ class Tetris:
         height_mul = 22
         touching_floor = 0
         touching_walls = 0
+        touching_edges = 0
 
         for j in range(1, 22):
             height_mul -= 1
@@ -116,6 +119,15 @@ class Tetris:
 
                     if i == 0 or i == 11:
                         touching_walls += 1
+
+                    if i > 0 and self.board[j][i - 1] == 0:
+                        touching_edges += 1  # Left edge
+                    if i < 11 and self.board[j][i + 1] == 0:
+                        touching_edges += 1  # Right edge
+                    if j > 1 and self.board[j - 1][i] == 0:
+                        touching_edges += 1  # Top edge
+                    if j < 21 and self.board[j + 1][i] == 0:
+                        touching_edges += 1  # Bottom edge
 
                 if self.board[j-1][i] != 0 and self.board[j][i] == 0:
                     holes += 1
@@ -132,7 +144,7 @@ class Tetris:
                         holes += 1
                         l += 1
 
-        return holes, blocades, height, touching_floor, touching_walls
+        return holes, blocades, height, touching_floor, touching_walls, touching_edges
 
     # (int, int, bool) => game_over, new_leaf
     def apply_move(self, rot, col, gen_next_piece=False):
