@@ -121,7 +121,7 @@ class Tetris:
         
         return (len(formes) - 1)
 
-    def cleared(self):
+    def get_cleared(self):
         return self.cleared
 
     def blocades(self):
