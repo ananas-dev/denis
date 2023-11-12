@@ -16,6 +16,8 @@ def playMove(col: int, rotate: int, piece_t: int):
     else:
         if rotate == 3:
             offset = 5 - col
+        else:
+            offset = 4 - col
 
     for _ in range(rotate): pyautogui.press('up')
 
