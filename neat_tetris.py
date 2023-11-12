@@ -17,7 +17,7 @@ train = False
 
 pop_size = 10
 fitness_threshold = 1000
-num_inputs = 4  # 7 inputs : height multiplier, blockades, hole, clear, ...
+num_inputs = 6  
 num_outputs = 1 # Score based on the 7 inputs
 num_generations = 10
 
@@ -132,7 +132,7 @@ def eval_genomes(genomes, config):
                 for rot1, col1 in t1.gen_legal_moves():
                     game_over, t2 = t1.apply_move(rot1, col1)
                     if game_over: continue
-                    t2_score = nets[i].activate((t2.get_cleared() ,*t2.get_stats()))[0]
+                    t2_score = nets[i].activate((t2.cleared ,*t2.get_stats()))[0]
                     if t2_score > max2_score:
                         max2_score = t2_score
 
@@ -180,7 +180,7 @@ def neat_command(current_block, next_block, game_board, net):
         for rot1, col1 in t1.gen_legal_moves():
             game_over, t2 = t1.apply_move(rot1, col1)
             if game_over: continue
-            t2_score = net.activate((t2.cleared ,*t2.get_stats()[:3]))[0]
+            t2_score = net.activate((t2.cleared ,*t2.get_stats()))[0]
             if t2_score > max2_score:
                 max2_score = t2_score
 
@@ -188,7 +188,6 @@ def neat_command(current_block, next_block, game_board, net):
             max1_score = max2_score
             best_move = (rot0, col0)
 
-    print("Best Move = ", best_move)
     return best_move[0], best_move[1]
 
     
@@ -224,37 +223,15 @@ if __name__ == "__main__":
     modify_config_file()
     # Tests on a game
     if not train: 
-        config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                            neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                            "config.txt")
-        print("Loading the best genome...")
-        genome = pickle.load(open('winner.pkl', 'rb'))
-        print("Genome loaded")
-        net = neat.nn.FeedForwardNetwork.create(genome, config)
+        net = load_genome("winner.pkl")
         # Tests the best genome on a test game
         clock = pg.time.Clock()
         t = tetris.Tetris()
-        graphic = graphics.Graphic(300, (64, 201, 255), (232, 28, 255), (255, 255, 255), t.board)
+        graphic = graphics.Graphic(300, (50, 50, 50), (100, 100, 100), (255, 255, 255), t.board)
         while True:
             clock.tick(30)
-            best_move = (None, None)
-            max1_score = float("-inf")
-            for rot0, col0 in t.gen_legal_moves():
-                game_over, t1 = t.apply_move(rot0, col0, gen_next_piece=True)
-                if game_over: continue
-
-                max2_score = float("-inf")
-                for rot1, col1 in t1.gen_legal_moves():
-                    game_over, t2 = t1.apply_move(rot1, col1)
-                    if game_over: continue
-                    t2_score = net.activate((t2.cleared, *t2.get_stats()[:3]))[0]
-                    if t2_score > max2_score:
-                        max2_score = t2_score
-
-                if max2_score > max1_score:
-                    max1_score = max2_score
-                    best_move = (rot0, col0)
-
+            
+            best_move = neat_command(t.current_piece, t.next_piece, t.board, net)
             if best_move != (None, None):
                 game_over, t = t.apply_move(*best_move, gen_next_piece=True)
 
@@ -270,6 +247,7 @@ if __name__ == "__main__":
             for event in pg.event.get():
                 if event.type == pg.QUIT:
                     pg.quit()
+                    quit()
 
             graphic.draw()
             
