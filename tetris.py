@@ -63,13 +63,13 @@ class Tetris:
 
         match clear_count:
             case 1:
-                self.score += 10
+                self.score += 100
             case 2:
-                self.score += 20
-            case 3:
-                self.score += 40
-            case 4:
                 self.score += 200
+            case 3:
+                self.score += 400
+            case 4:
+                self.score += 2000
 
     def next_pos(self):
         self.next_piece = random.randint(1, 7)
@@ -86,7 +86,7 @@ class Tetris:
         # Quick out of bound check
         if col + size_x > 12:
             col = 12 - size_x
-            self.score -= 100
+            self.score -= 10000
 
         # Place the piece
         for y in range(0, 23 - size_y):
@@ -112,9 +112,10 @@ class Tetris:
                         return
             
             if self.max_height > self.old_max_height:
-                self.score -= self.max_height
+                self.score -= (self.max_height - self.old_max_height) * int(np.exp(self.max_height) * 0.001) 
 
             self.old_max_height = self.max_height
+            self.score += 10
 
 
     def print(self):
