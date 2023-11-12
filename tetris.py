@@ -97,15 +97,6 @@ class Tetris:
 
         return new_board, self.score + clear_count * 1000, self.cleared + clear_count
 
-    def height_multiplier(self):
-        res = 0
-        for i, row in enumerate(self.board):
-            for val in row:
-                if val != 0:
-                    res += 22 - i
-
-        return res
-
     def get_stats(self):
         holes = 0
         blocades = 0
@@ -123,7 +114,7 @@ class Tetris:
                     holes += 1
                     blocades += 1
 
-                    k = 1
+                    k = 2
                     l = 1
 
                     while j - k >= 0 and self.board[j-k][i] != 0:
@@ -188,7 +179,6 @@ if __name__ == "__main__":
     print("Holes:", holes)
     print("Blocades:", blocades)
     print("Height:", height)
-    print("Height:", t.height_multiplier())
 
     graphic = Graphic(400, (0, 0, 0), (0, 0, 0),  (255, 255, 255), t.board)
     graphic.draw()
