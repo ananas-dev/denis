@@ -110,12 +110,11 @@ class Tetris:
         holes = 0
         blocades = 0
         height = 0
-        height_mul = 0
+        height_mul = 22
 
-        for i in range(12):
-            height_mul = 0
-            for j in range(1, 22):
-                height_mul += 1
+        for j in range(1, 22):
+            height_mul -= 1
+            for i in range(12):
 
                 if self.board[j][i] != 0:
                     height += height_mul
@@ -178,7 +177,7 @@ if __name__ == "__main__":
 
     for _ in range(20):
         move = random.choice(t.gen_legal_moves())
-        game_over, t = t.apply_move(*move)
+        game_over, t = t.apply_move(*move, gen_next_piece=True)
 
         if game_over:
             break
@@ -189,6 +188,7 @@ if __name__ == "__main__":
     print("Holes:", holes)
     print("Blocades:", blocades)
     print("Height:", height)
+    print("Height:", t.height_multiplier())
 
     graphic = Graphic(400, (0, 0, 0), (0, 0, 0),  (255, 255, 255), t.board)
     graphic.draw()
