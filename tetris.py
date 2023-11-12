@@ -45,7 +45,7 @@ class Tetris:
     def place_pieces(self, piece, size_x, size_y, x, y):
         for i in range(size_x):
             for j in range(size_y):
-                if x + i < 12 and self.board[y + j][x + i] == 0 and piece[j][i] != 0:
+                if self.board[y + j][x + i] == 0 and piece[j][i] != 0:
                     self.board[y + j][x + i] = piece[j][i] * self.current_piece
 
     def check_lines(self):
@@ -110,16 +110,11 @@ if __name__ == "__main__":
 
     while True:
         t = Tetris()
-        graphic = graphics.Graphic(300, (64, 201, 255), (232, 28, 255), (255, 255, 255), t.board)
 
         while not t.game_over:
             t.next_pos()
-            t.current_piece = 7
-            t.next_piece = 7
-            t.play(0, random.randint(0, 9))
+            t.play(random.randint(0, 3), random.randint(0, 8))
             t.print()
-            graphic.draw()
-            time.sleep(0.1)
 
     # graphic = graphics.Graphic(300, (64, 201, 255), (232, 28, 255), (255, 255, 255), t.board)
     # graphic.draw()
