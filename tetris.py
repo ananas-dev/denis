@@ -52,7 +52,7 @@ class Tetris:
     def place_pieces(self, piece, size, x, y):
         for i in range(size):
             for j in range(size):
-                if y + j < 22 and self.board[y + j][x + i] == 0 and piece[j][i] != 0:
+                if y + j < 22 and x + i < 12 and self.board[y + j][x + i] == 0 and piece[j][i] != 0:
                     self.board[y + j][x + i] = piece[j][i] * self.current_piece
 
     def check_lines(self):
@@ -88,8 +88,14 @@ class Tetris:
         size = len(pieces[self.current_piece - 1])
 
         if col + size > 12:
-            self.game_over = True
-            return
+            if np.any(piece[:, size - 1] != 0):
+                self.game_over = True
+                return
+
+            # dirty hack for I piece
+            if self.current_piece == 7 and np.any(piece[:, size - 2] != 0):
+                self.game_over = True
+                return
 
         # Place the piece
         for y in range(0, 23 - size):
