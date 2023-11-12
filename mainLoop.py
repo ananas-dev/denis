@@ -34,10 +34,9 @@ def main():
         if not np.all(difference == 0):
             # On doit jouer un coup avec les data de Frame.
             pieceActuelle, pieceSuivante, gameMatrix = frame.get('pieceActuelle'), frame.get('pieceSuivante'), frame.get('Matrix')
-                
             # Génération du meilleur coup selon l'AI <net>
             commands = neat_command(pieceActuelle, pieceSuivante, gameMatrix, net)
-            # Format : [Turns, Row]
+            # Format : [Turns, Col]
             playMove(5 - commands[1], commands[0])  # On joue le coup suggéré
 
         prev_iteration = iteration  # On update l'ancienne itération. >___<"
