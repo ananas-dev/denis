@@ -119,11 +119,27 @@ def eval_genomes(genomes, config):
         #     tet[i].play(*commands)
         #     ge[i].fitness = t.score
         #     t.next_pos() 
+
         for i, t in enumerate(games):
             positions = t.get_positions()
+            for pos in positions:
+                pass
 
 
+def load_genome(genome_path):
+        config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                            neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                            "config.txt")
+        print("Loading the best genome...")
+        genome = pickle.load(open('winner.pkl', 'rb'))
+        print("Genome loaded")
+        net = neat.nn.FeedForwardNetwork.create(genome, config)
+        return net
 
+def neat_command(current_block, next_block, game_board, net):
+    commands = net.activate((current_block, next_block, *flatten_matrix(game_board)))
+    commands = convert_command(commands, 12)
+    return commands
 
     
             
