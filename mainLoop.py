@@ -1,7 +1,8 @@
 from image_recognition import getData
 import numpy as np
 import pyautogui
-import random
+from neat_tetris import load_genome, neat_command
+
 
 def playMove(move, rotate: int):
     if move > 0:
@@ -14,6 +15,8 @@ def playMove(move, rotate: int):
 
 def main():
 
+    net = load_genome("winner.pkl")
+    # Initialisation de l'AI depuis un dataset .pkl
     frame = getData()
     prev_iteration = np.array(frame.get('Matrix'))
 
@@ -30,10 +33,12 @@ def main():
         difference = np.array(iteration - prev_iteration)
         if not np.all(difference == 0):
             # On doit jouer un coup avec les data de Frame.
-            print(f"On doit jouer un coup !")
-            playMove(random.randint(-5, 5), random.randint(0, 3))
-            ...  # Get bests moves from AI.
-            ...  # Some function 2 execute inputs.
+            pieceActuelle, pieceSuivante, gameMatrix = frame.get('pieceActuelle'), frame.get('pieceSuivante'), frame.get('Matrix')
+            
+            # Génération du meilleur coup selon l'AI <net>
+            commands = neat_command(pieceActuelle, pieceSuivante, gameMatrix, net)
+            # Format : [Turns, Row]
+            playMove(5 - commands[1], commands[0])  # On joue le coup suggéré
 
         prev_iteration = iteration  # On update l'ancienne itération. >___<"
 
