@@ -69,10 +69,9 @@ def main(NN_name: str):
 
             # On doit jouer un coup avec les data de Frame.
             pieceActuelle, pieceSuivante, gameMatrix = frame.get('pieceActuelle'), frame.get('pieceSuivante'), frame.get('Matrix')
-
+            
             # Génération du meilleur coup selon l'AI <net> (Format : [Rotation, Column])
             _r, _c = neat_command(pieceActuelle, pieceSuivante, gameMatrix, net)
-
             playMove(_c, _r, pieceActuelle)  # On joue le coup.
 
         prev_iteration = iteration  # On update l'ancienne itération.

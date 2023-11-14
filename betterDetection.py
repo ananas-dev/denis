@@ -1,6 +1,7 @@
 import pyautogui
 import numpy as np
 from PIL import Image
+from RGB_CONFIG import *
 
 
 def getAllPieces(matrix: list) -> list:
@@ -105,7 +106,7 @@ def getGameFrame(tolerance: int = 0):
     screenshot = pyautogui.screenshot()
     image_np = np.array(screenshot)
 
-    target_color = np.array([190, 157, 127])    
+    target_color = np.array(BORDER_RGB)
     # RGB Values de la bordure. Susceptible de changer un peu, en fonction de la version du jeu. (1.19)
     # Calculer la distance entre chaque pixel de l'image et la couleur de la bordure
     color_distance = np.linalg.norm(image_np - target_color, axis=-1)
@@ -130,11 +131,11 @@ def getData():
     # de jeu sous forme d'un dictionnaire (voir retour).
     # Les exceptions du code sont gérées normalement sans exit (par des return de 0).
 
-    gameFrame = getGameFrame(0)  # On récupère la Frame du Tetris (Tolérance set sur 0, peut changer à max ~ 5).
+    gameFrame = getGameFrame(TOLERANCE_BORDER)  # On récupère la Frame du Tetris (Tolérance set sur 0, peut changer à max ~ 5).
     if gameFrame is None:
         while gameFrame is None:
             print('[?] Trying to get game Frame...')
-            gameFrame = getGameFrame(0)
+            gameFrame = getGameFrame(TOLERANCE_BORDER)
     
     width, height = gameFrame.size
     border = width / 2.3  # Ratio entre les infos et le board
@@ -147,15 +148,8 @@ def getData():
     hauteur_bloc = gameBoard.height // 22   # Dimension en hauteur du board !
     gameMatrix = [[0 for _ in range(12)] for _ in range(22)]
     
-    RGB_2_ID = {
-        (61, 195, 92): 1,
-        (43, 168, 245): 2,
-        (255, 169, 61): 3,
-        (255, 98, 38): 4,
-        (203, 87, 192): 5,
-        (153, 153, 153): 6,
-        (255, 0, 28): 7}
-    
+    RGB_2_ID = {GREEN: 1, BLUE: 2, YELLOW: 3, ORANGE: 4, PURPLE: 5, GRAY: 6, RED: 7}
+
     # 1 : Green   | 2 : Blue
     # 3 : Yellow  | 4 : Orange
     # 5 : Purple  | 6 : Gray
@@ -191,7 +185,7 @@ def getData():
             cx, cy = (left + right) // 2, (upper + lower) // 2
             _r, _g, _b = npGameBoard[cy, cx]  # On obtient la couleur au centre.
             
-            gameMatrix[i][j] = find_closest_color((_r, _g, _b), RGB_2_ID, tolerance=20)
+            gameMatrix[i][j] = find_closest_color((_r, _g, _b), RGB_2_ID, tolerance=TOLERANCE_PIECES)
             # On place l'ID de la couleur correspondante dans la matrice.
             # Tolérance set à 20 par défaut ; si pas accurate l'auguementer (il devrait pas y'avoir besoin).
 
@@ -201,7 +195,7 @@ def getData():
 
     COLOR = 0
     for target_color, color_ID in RGB_2_ID.items():
-        mask = np.all(np.abs(npGameInfo - np.array(target_color)) <= 20, axis=2)
+        mask = np.all(np.abs(npGameInfo - np.array(target_color)) <= TOLERANCE_PIECES, axis=2)
         if np.any(mask): COLOR = color_ID; continue
     pieceSuivante = COLOR  # On récupère la pièce suivante :)
 
@@ -219,5 +213,6 @@ if __name__ == '__main__':
 
     # Testing purpose >__<"
     w = getData()
-    print(w.get('pieceSuivante'))
+    for row in w.get('Matrix'):
+        print(row)
         
