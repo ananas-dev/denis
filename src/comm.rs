@@ -2,7 +2,7 @@ use std::io;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{nn::FeedForwardNetwork, pos::Position, search};
+use crate::{net::FeedForwardNetwork, pos::Position, search};
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
@@ -47,7 +47,7 @@ pub fn start() -> io::Result<()> {
     let mut buffer = String::new();
     let stdin = io::stdin(); // We get `Stdin` here.
     let mut pos: Position = Position::default();
-    let mut nn: Option<FeedForwardNetwork> = None;
+    let mut net: Option<FeedForwardNetwork> = None;
 
     loop {
         buffer.clear();
@@ -60,7 +60,7 @@ pub fn start() -> io::Result<()> {
                 output_nodes,
                 node_evals,
             } => {
-                nn = Some(FeedForwardNetwork::new(
+                net = Some(FeedForwardNetwork::new(
                     input_nodes,
                     output_nodes,
                     node_evals,
@@ -76,7 +76,7 @@ pub fn start() -> io::Result<()> {
                 pos = Position::new(current_piece, next_piece, lines, score, board);
             }
             In::Go => {
-                if let Some(nn) = &mut nn {
+                if let Some(nn) = &mut net {
                     let best = search::find_best_move(nn, &pos);
                     pos = pos.apply_move(best.0, best.1).unwrap();
                 }
@@ -94,7 +94,7 @@ pub fn start() -> io::Result<()> {
                 )
             }
             In::PlayGame => {
-                if let Some(nn) = &mut nn {
+                if let Some(nn) = &mut net {
                     let mut best = search::find_best_move(nn, &pos);
                     while let Some(new_pos) = pos.apply_move(best.0, best.1) {
                         pos = new_pos;

@@ -1,7 +1,6 @@
-use crate::{nn::FeedForwardNetwork, pos::Position};
+use crate::{net::FeedForwardNetwork, pos::Position};
 
-
-pub fn find_best_move(nn: &mut FeedForwardNetwork, pos: &Position) -> (usize, usize) {
+pub fn find_best_move(net: &mut FeedForwardNetwork, pos: &Position) -> (usize, usize) {
     let mut maxscore = -f64::INFINITY;
     let mut best_move = (0, 0);
 
@@ -14,14 +13,9 @@ pub fn find_best_move(nn: &mut FeedForwardNetwork, pos: &Position) -> (usize, us
                 let (x, rotation) = *move2;
 
                 if let Some(pos) = pos.apply_move(x, rotation) {
-                    let features = pos.features();
+                    let input = pos.board.iter().map(|&byte| byte as f64).collect();
 
-                    let score = nn.activate(vec![
-                        features.lines,
-                        features.holes,
-                        features.blocades,
-                        features.height,
-                    ])[0];
+                    let score = net.activate(input)[0];
 
                     if score > sub_maxscore {
                         sub_maxscore = score

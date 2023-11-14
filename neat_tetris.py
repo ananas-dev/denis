@@ -1,16 +1,15 @@
 import os
+import threading
 import pygame as pg
 import numpy as np
 import neat
 import pickle # Used to save the model
-import multiprocessing
 import graphics
 import engine
-import tetris
 
 
 ### TRAINING PARAMETERS ###
-train = False
+train = True
 
 
 ##########################
@@ -18,9 +17,9 @@ train = False
 
 pop_size = 16
 fitness_threshold = 1000
-num_inputs = 4
+num_inputs = 22 * 12
 num_outputs = 1 # Score based on the 7 inputs
-num_generations = 100
+num_generations = 100000
 
 ##########################
 ##########################
@@ -78,30 +77,18 @@ def flatten_matrix(matrix):
     """
     return [item for sublist in matrix for item in sublist]
 
-def eval_genomes(genomes, config):
-    """Creates the eval function that will be used in a thread pool for each genome
-
-    Args:
-        genomes (genome): genome object
-        config (config): config object
-        
-        returns : fitness of the genome
-    """
+def eval_genome(genome, config):
     play_engine = engine.Engine("./target/release/neat-tetris")
 
+    net = neat.nn.FeedForwardNetwork.create(genome, config)
+    cleaned_node_evals = []
 
-    for _, genome in genomes:
-        net = neat.nn.FeedForwardNetwork.create(genome, config)
-        cleaned_node_evals = []
+    for e in net.node_evals:
+        a, _, _, b, c, d = e
+        cleaned_node_evals.append((a, b, c, d))
 
-        for e in net.node_evals:
-            a, _, _, b, c, d = e
-            cleaned_node_evals.append((a, b, c, d))
-
-        play_engine.load(net.input_nodes, net.output_nodes, cleaned_node_evals)
-        genome.fitness = play_engine.play_game()
-
-    play_engine.terminate()
+    play_engine.load(net.input_nodes, net.output_nodes, cleaned_node_evals)
+    return play_engine.play_game()
 
 def load_genome(genome_path):
         config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
@@ -112,32 +99,6 @@ def load_genome(genome_path):
         print("Genome loaded")
         net = neat.nn.FeedForwardNetwork.create(genome, config)
         return net
-
-def neat_command(current_block, next_block, game_board, net):
-    if current_block == None:
-        return (None, None)
-
-    t = tetris.Tetris(board=np.array(game_board), current_piece=current_block, next_piece=next_block)
-    
-    best_move = (None, None)
-    max1_score = float("-inf")
-    for rot0, col0 in t.gen_legal_moves():
-        game_over, t1 = t.apply_move(rot0, col0)
-        if game_over: continue
-
-        max2_score = float("-inf")
-        for rot1, col1 in t1.gen_legal_moves():
-            game_over, t2 = t1.apply_move(rot1, col1)
-            if game_over: continue
-            t2_score = net.activate((t2.cleared ,*t2.get_stats()))[0]
-            if t2_score > max2_score:
-                max2_score = t2_score
-
-        if max2_score > max1_score:
-            max1_score = max2_score
-            best_move = (rot0, col0)
-
-    return best_move[0], best_move[1]
 
 ### RUN FUNCTION ###
 def run(config_file, retrain=False):
@@ -159,13 +120,12 @@ def run(config_file, retrain=False):
     
     p.add_reporter(neat.StdOutReporter(True))
     p.add_reporter(neat.StatisticsReporter())
-    p.add_reporter(neat.Checkpointer(10, None)) # Saves the model every two generations
+    p.add_reporter(neat.Checkpointer(100, None)) # Saves the model every two generations
 
-    winner = p.run(eval_genomes, num_generations) # Runs the population 'number_generations' generations
+    evaluator = neat.ParallelEvaluator(16, eval_genome)
+
+    winner = p.run(evaluator.evaluate, num_generations) # Runs the population 'number_generations' generations
     pickle.dump(winner, open('winner.pkl', 'wb')) # Saves the best genome
-    
-
-
 
 if __name__ == "__main__":
     modify_config_file()
@@ -189,7 +149,7 @@ if __name__ == "__main__":
 
         graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board)
         while True:
-            clock.tick(60)
+            clock.tick(10)
 
             play_engine.go()
             pos = play_engine.peek()

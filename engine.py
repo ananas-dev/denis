@@ -53,5 +53,5 @@ class Engine:
         self.send_message(msg)
         return self.receive_message()
 
-    def terminate(self):
+    def __del__(self):
         self.process.terminate()
