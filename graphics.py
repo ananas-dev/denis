@@ -79,8 +79,8 @@ class Graphic():
 
     def draw(self):
         self.fill_gradient(self.display, self.bg_color_1, self.bg_color_2)
-        self.draw_grid()
         self.draw_board()
+        self.draw_grid()
         pg.display.update()
 
 

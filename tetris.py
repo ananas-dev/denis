@@ -5,7 +5,7 @@ import time
 
 from graphics import Graphic
 
-PIECES = [
+PIECE_SHAPES = [
     [
         [0,0,1],
         [1,1,1],
@@ -35,10 +35,12 @@ PIECES = [
     ]
 ]
 
+PIECES = [[np.rot90(p) for _ in range(4)] for p in PIECE_SHAPES]
+
 class Tetris:
     def __init__(
             self,
-            board=np.zeros((22, 12)),
+            board=np.zeros((22, 12), dtype=np.int8),
             score = 0,
             cleared = 0,
             current_piece=random.randint(1, 7),
@@ -52,7 +54,7 @@ class Tetris:
     def gen_legal_moves(self):
         legal_moves = []
         for rot in range(0, 4):
-            piece = np.rot90(PIECES[self.current_piece - 1], rot)
+            piece = PIECES[self.current_piece - 1][rot]
             _, size_x = piece.shape
             for col in range(0, 13 - size_x):
                 legal_moves.append((rot, col))
@@ -62,10 +64,8 @@ class Tetris:
     def place_pieces(self, piece, size_x, size_y, x, y):
         new_board = self.board.copy()
 
-        for i in range(size_x):
-            for j in range(size_y):
-                if new_board[y + j][x + i] == 0 and piece[j][i] != 0:
-                    new_board[y + j][x + i] = piece[j][i] * self.current_piece
+        mask = (new_board[y:y+size_y, x:x+size_x] == 0) & piece
+        new_board[y:y+size_y, x:x+size_x] += piece * self.current_piece * mask
 
         clear_count = 0
 
@@ -85,30 +85,12 @@ class Tetris:
         blocades = 0
         height = 0
         height_mul = 22
-        touching_floor = 0
-        touching_walls = 0
-        touching_edges = 0
 
         for j in range(1, 22):
             height_mul -= 1
             for i in range(12):
                 if self.board[j][i] != 0:
                     height += height_mul
-
-                    if j == 21:
-                        touching_floor += 1
-
-                    if i == 0 or i == 11:
-                        touching_walls += 1
-
-                    if i > 0 and self.board[j][i - 1] != 0:
-                        touching_edges += 1  # Left edge
-                    if i < 11 and self.board[j][i + 1] != 0:
-                        touching_edges += 1  # Right edge
-                    if j > 1 and self.board[j - 1][i] != 0:
-                        touching_edges += 1  # Top edge
-                    if j < 21 and self.board[j + 1][i] != 0:
-                        touching_edges += 1  # Bottom edge
 
                 if self.board[j-1][i] != 0 and self.board[j][i] == 0:
                     holes += 1
@@ -125,7 +107,7 @@ class Tetris:
                         holes += 1
                         l += 1
 
-        return holes, blocades, height, touching_floor, touching_walls, touching_edges
+        return holes, blocades, height
 
     # (int, int, bool) => game_over, new_leaf
     def apply_move(self, rot, col, gen_next_piece=False):
@@ -136,7 +118,7 @@ class Tetris:
             next_piece = 0
 
 
-        piece = np.rot90(PIECES[self.current_piece - 1], rot)
+        piece = PIECES[self.current_piece - 1][rot]
         size_y, size_x = piece.shape
 
         for y in range(0, 23 - size_y):
@@ -144,16 +126,14 @@ class Tetris:
                 new_board, new_score, new_cleared = self.place_pieces(piece, size_x, size_y, col, y)
                 return False, Tetris(new_board, new_score, new_cleared, self.next_piece, next_piece)
 
-            for i in range(size_x):
-                for j in range(size_y):
-                    if col + i < 12 and piece[j][i] != 0 and self.board[j + y + 1][i + col] != 0:
-                        new_board, new_score, new_cleared = self.place_pieces(piece, size_x, size_y, col, y)
+            if np.any((self.board[y + 1:y + 1 + size_y, col:col + size_x] != 0) & piece):
+                new_board, new_score, new_cleared = self.place_pieces(piece, size_x, size_y, col, y)
 
-                        if np.any(new_board[0] != 0):
-                            return True, None
+                if np.any(new_board[0] != 0):
+                    return True, None
 
-                        return False, Tetris(new_board, new_score, new_cleared, self.next_piece, next_piece)
-                
+                return False, Tetris(new_board, new_score, new_cleared, self.next_piece, next_piece)
+
     def print(self):
         print(self.board)
 
@@ -168,17 +148,12 @@ if __name__ == "__main__":
             break
 
     
-    holes, blocades, height, touching_floor, touching_walls, touching_edges = t.get_stats()
-
-    print("Holes:", holes)
-    print("Blocades:", blocades)
-    print("Height:", height)
-    print("Touching down:", touching_floor)
-    print("Touching walls:", touching_walls)
-    print("Touching walls:", touching_edges)
+    print(t.board)
+    print(t.get_stats())
 
     graphic = Graphic(400, (0, 0, 0), (0, 0, 0),  (255, 255, 255), t.board)
     graphic.draw()
+
     while True:
         for event in pg.event.get():
             if event.type == pg.QUIT:

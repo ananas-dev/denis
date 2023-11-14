@@ -4,20 +4,21 @@ import numpy as np
 import neat
 import pickle # Used to save the model
 import multiprocessing
-import tetris
 import graphics
+import engine
+import tetris
 
 
 ### TRAINING PARAMETERS ###
-train = True
+train = False
 
 
 ##########################
 ### NEAT CONFIGURATION ###
 
-pop_size = 10
+pop_size = 16
 fitness_threshold = 1000
-num_inputs = 7  
+num_inputs = 4
 num_outputs = 1 # Score based on the 7 inputs
 num_generations = 100
 
@@ -86,82 +87,28 @@ def eval_genomes(genomes, config):
         
         returns : fitness of the genome
     """
-    global p
-    games = []
-    ge = []
-    nets = []
+    play_engine = engine.Engine("./target/release/neat-tetris")
 
-    for _id, genome in genomes:
-        games.append(tetris.Tetris())
-        ge.append(genome)
+
+    for _, genome in genomes:
         net = neat.nn.FeedForwardNetwork.create(genome, config)
-        nets.append(net)
-        genome.fitness = 0
+        cleaned_node_evals = []
 
-    # Runs the game until it ends
-    while True:
+        for e in net.node_evals:
+            a, _, _, b, c, d = e
+            cleaned_node_evals.append((a, b, c, d))
 
-        # for i, t in enumerate(tet):
-        #     if t.game_over:
-        #         tet.pop(i)
-        #         ge.pop(i)
-        #         nets.pop(i)
+        play_engine.load(net.input_nodes, net.output_nodes, cleaned_node_evals)
+        genome.fitness = play_engine.play_game()
 
-        # if len(tet) == 0:
-        #     break
-        
-        # for i, t in enumerate(tet):
-        #     game_state = t.board  # Gets the current state of the game
-        #     current_block = t.current_piece
-        #     next_block = t.next_piece
-        #     commands = nets[i].activate((current_block, next_block, *flatten_matrix(game_state)))
-        #     commands = convert_command(commands, 12)
-        #     tet[i].play(*commands)
-        #     ge[i].fitness = t.score
-        #     t.next_pos() 
-
-        for i, t in enumerate(games):
-            best_board = None
-
-            max1_score = float("-inf")
-            for rot0, col0 in t.gen_legal_moves():
-                game_over, t1 = t.apply_move(rot0, col0, gen_next_piece=True)
-                if game_over: continue
-
-                max2_score = float("-inf")
-                for rot1, col1 in t1.gen_legal_moves():
-                    game_over, t2 = t1.apply_move(rot1, col1)
-                    if game_over: continue
-                    t2_score = nets[i].activate((t2.cleared ,*t2.get_stats()))[0]
-                    if t2_score > max2_score:
-                        max2_score = t2_score
-
-                if max2_score > max1_score:
-                    max1_score = max2_score
-                    best_board = t1
-            
-            if best_board != None:
-                games[i] = best_board
-                ge[i].fitness = best_board.score
-            else:
-                games.pop(i)
-                ge.pop(i)
-                nets.pop(i)
-
-            if len(games) == 0:
-                return
-            
-        print("Population left : ", len(games))
-            
-            
-
+    play_engine.terminate()
 
 def load_genome(genome_path):
         config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
                             neat.DefaultSpeciesSet, neat.DefaultStagnation,
                             "config.txt")
         print("Loading the best genome...")
-        genome = pickle.load(open('winner.pkl', 'rb'))
+        genome = pickle.load(open(genome_path, 'rb'))
         print("Genome loaded")
         net = neat.nn.FeedForwardNetwork.create(genome, config)
         return net
@@ -192,9 +139,6 @@ def neat_command(current_block, next_block, game_board, net):
 
     return best_move[0], best_move[1]
 
-    
-            
-
 ### RUN FUNCTION ###
 def run(config_file, retrain=False):
     global p
@@ -215,7 +159,8 @@ def run(config_file, retrain=False):
     
     p.add_reporter(neat.StdOutReporter(True))
     p.add_reporter(neat.StatisticsReporter())
-    p.add_reporter(neat.Checkpointer(2, None)) # Saves the model every two generations
+    p.add_reporter(neat.Checkpointer(10, None)) # Saves the model every two generations
+
     winner = p.run(eval_genomes, num_generations) # Runs the population 'number_generations' generations
     pickle.dump(winner, open('winner.pkl', 'wb')) # Saves the best genome
     
@@ -229,32 +174,39 @@ if __name__ == "__main__":
         net = load_genome("winner.pkl")
         # Tests the best genome on a test game
         clock = pg.time.Clock()
-        t = tetris.Tetris()
-        graphic = graphics.Graphic(300, (50, 50, 50), (100, 100, 100), (255, 255, 255), t.board)
-        while True:
-            clock.tick(30)
-            
-            best_move = neat_command(t.current_piece, t.next_piece, t.board, net)
-            if best_move != (None, None):
-                game_over, t = t.apply_move(*best_move, gen_next_piece=True)
+        # t = tetris.Tetris()
+        play_engine = engine.Engine("./target/release/neat-tetris")
 
-            graphic.board = t.board
-            graphic.draw()
-            if game_over:
-                break
-        
-        print("Game over !")
-        print("Score :", t.score)
+        cleaned_node_evals = []
+        for e in net.node_evals:
+            a, _, _, b, c, d = e
+            cleaned_node_evals.append((a, b, c, d))
 
+        play_engine.load(net.input_nodes, net.output_nodes, cleaned_node_evals)
+
+        pos = play_engine.peek()
+        board = np.array(pos["board"]).reshape(22, 12)
+
+        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board)
         while True:
+            clock.tick(60)
+
+            play_engine.go()
+            pos = play_engine.peek()
+
+            graphic.board = np.array(pos["board"]).reshape(22, 12)
+
             for event in pg.event.get():
                 if event.type == pg.QUIT:
                     pg.quit()
                     quit()
 
             graphic.draw()
-            
 
+        print("Game over !")
+        print("Score :", t.score)
+
+        play_engine.terminate()
 
     # Trains the model
     else:
