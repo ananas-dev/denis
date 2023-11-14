@@ -172,9 +172,11 @@ impl Position {
                             if count == 12 {
                                 line_count += 1;
 
+                                let new_board_clone = new_board.clone();
+
                                 for k in 0..j {
                                     for l in 0..12 {
-                                        new_board[(k + 1) * 12 + l] = self.board[k * 12 + l]
+                                        new_board[(k + 1) * 12 + l] = new_board_clone[k * 12 + l]
                                     }
                                 }
 
