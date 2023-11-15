@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, collections::VecDeque};
 
 use serde::{Deserialize, Serialize};
 
@@ -15,12 +15,13 @@ enum In {
     Pos {
         score: i64,
         current_piece: usize,
-        next_piece: usize,
+        next_pieces: VecDeque<usize>,
         lines: usize,
-        board: Vec<u8>,
+        board: Vec<Vec<u8>>,
     },
     Peek,
     PlayGame,
+    Ready,
     Go,
 }
 
@@ -34,13 +35,20 @@ enum Out {
     Pos {
         score: i64,
         current_piece: usize,
-        next_piece: usize,
+        next_pieces: VecDeque<usize>,
         lines: usize,
-        board: Vec<u8>,
+        board: Vec<Vec<u8>>,
     },
     GameResult {
         score: i64,
-    }
+    },
+    Ok,
+    Ko,
+}
+
+fn send(msg: &Out) -> io::Result<()> {
+    println!("{}", serde_json::to_string(msg)?);
+    Ok(())
 }
 
 pub fn start() -> io::Result<()> {
@@ -69,16 +77,16 @@ pub fn start() -> io::Result<()> {
             In::Pos {
                 score,
                 current_piece,
-                next_piece,
+                next_pieces,
                 lines,
                 board,
             } => {
-                pos = Position::new(current_piece, next_piece, lines, score, board);
+                pos = Position::new(current_piece, next_pieces, lines, score, board);
             }
             In::Go => {
                 if let Some(nn) = &mut net {
                     let best = search::find_best_move(nn, &pos);
-                    pos = pos.apply_move(best.0, best.1).unwrap();
+                    pos = pos.apply_move(best.0, best.1, true).unwrap();
                 }
             }
             In::Peek => {
@@ -87,7 +95,7 @@ pub fn start() -> io::Result<()> {
                     serde_json::to_string(&Out::Pos {
                         score: pos.score,
                         current_piece: pos.current_piece,
-                        next_piece: pos.next_piece,
+                        next_pieces: pos.next_pieces.clone(),
                         lines: pos.lines,
                         board: pos.board.clone()
                     })?
@@ -96,13 +104,19 @@ pub fn start() -> io::Result<()> {
             In::PlayGame => {
                 if let Some(nn) = &mut net {
                     let mut best = search::find_best_move(nn, &pos);
-                    while let Some(new_pos) = pos.apply_move(best.0, best.1) {
+                    while let Some(new_pos) = pos.apply_move(best.0, best.1, true) {
                         pos = new_pos;
                         best = search::find_best_move(nn, &pos);
                     }
 
-                    println!("{}", serde_json::to_string(&Out::GameResult { score: pos.score })?);
+                    send(&Out::GameResult { score: pos.score })?;
                     pos = Position::default();
+                }
+            },
+            In::Ready => {
+                match net {
+                    Some(_) => send(&Out::Ok)?,
+                    None => send(&Out::Ko)?,
                 }
             },
         }

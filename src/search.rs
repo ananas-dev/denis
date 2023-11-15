@@ -4,31 +4,43 @@ pub fn find_best_move(net: &mut FeedForwardNetwork, pos: &Position) -> (usize, u
     let mut maxscore = -f64::INFINITY;
     let mut best_move = (0, 0);
 
-    for move1 in pos.gen_legal_moves().iter() {
-        let mut sub_maxscore = -f64::INFINITY;
-        let (x, rotation) = *move1;
+    for &(col, rot) in pos.gen_legal_moves().iter() {
+        if let Some(pos) = pos.apply_move(col, rot, false) {
+            let score = search(net, pos, 2);
 
-        if let Some(pos) = pos.apply_move(x, rotation) {
-            for move2 in pos.gen_legal_moves().iter() {
-                let (x, rotation) = *move2;
-
-                if let Some(pos) = pos.apply_move(x, rotation) {
-                    let input = pos.board.iter().map(|&byte| byte as f64).collect();
-
-                    let score = net.activate(input)[0];
-
-                    if score > sub_maxscore {
-                        sub_maxscore = score
-                    }
-                }
+            if score > maxscore {
+                maxscore = score;
+                best_move = (col, rot);
             }
-        }
-
-        if sub_maxscore > maxscore {
-            maxscore = sub_maxscore;
-            best_move = *move1;
         }
     }
 
     best_move
+}
+
+fn search(net: &mut FeedForwardNetwork, pos: Position, depth: usize) -> f64 {
+    if depth == 0 {
+        let features = pos.features();
+
+        return net.activate(vec![
+            features.lines,
+            features.holes,
+            features.blocades,
+            features.height,
+        ])[0];
+    }
+
+    let mut maxscore = -f64::INFINITY;
+
+    for &(col, rot) in pos.gen_legal_moves().iter() {
+        if let Some(pos) = pos.apply_move(col, rot, false) {
+            let score = search(net, pos, depth - 1);
+
+            if score > maxscore {
+                maxscore = score;
+            }
+        }
+    }
+
+    maxscore
 }
