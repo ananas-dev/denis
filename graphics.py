@@ -87,7 +87,7 @@ class Graphic():
 
 
     def show_score(self):
-        score_text = self.font.render(f'Score : {self.score}', True, (255, 0, 0))
+        score_text = self.font.render(f'Score : {self.score}', True, (255, 0, 0), self.bg_color_1)
         self.display.blit(score_text, (10, 10))
 
     def draw(self):
