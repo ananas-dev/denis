@@ -4,9 +4,12 @@ import numpy as np
 class Graphic():
 
     def __init__(self, width, bg_color_1, bg_color_2, grid_color, board, fps=10):
+        pg.init()
+        pg.font.init()
         self.clock = pg.time.Clock()
         self.fps = fps
         self.board = board
+        self.score = 0
         self.num_columns, self.num_rows = board.shape[1], board.shape[0]
         self.width = width
         self.height = self.width * self.num_rows / self.num_columns
@@ -16,6 +19,7 @@ class Graphic():
         self.block_width = self.width / self.num_columns
         self.block_height = self.height / self.num_rows
         self.display = pg.display.set_mode((self.width, self.height))
+        self.font = pg.font.Font(None, 36)
         self.ID_2_RGB = {
             1 : (56, 196, 79),
             2 : (50, 164, 250),
@@ -81,10 +85,16 @@ class Graphic():
                     color = self.ID_2_RGB[self.board[row][col]]
                     pg.draw.rect(self.display, color, (col * self.block_width, row * self.block_height, self.block_width, self.block_height), 0)
 
+
+    def show_score(self):
+        score_text = self.font.render(f'Score : {self.score}', True, (255, 0, 0))
+        self.display.blit(score_text, (10, 10))
+
     def draw(self):
         self.fill_gradient(self.display, self.bg_color_1, self.bg_color_2)
         self.draw_board()
         self.draw_grid()
+        self.show_score()
         pg.display.update()
 
     def tick(self):
