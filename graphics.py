@@ -3,7 +3,9 @@ import numpy as np
 
 class Graphic():
 
-    def __init__(self, width, bg_color_1, bg_color_2, grid_color, board):
+    def __init__(self, width, bg_color_1, bg_color_2, grid_color, board, fps=10):
+        self.clock = pg.time.Clock()
+        self.fps = fps
         self.board = board
         self.num_columns, self.num_rows = board.shape[1], board.shape[0]
         self.width = width
@@ -67,8 +69,10 @@ class Graphic():
     def draw_grid(self):
         for row in range(self.num_rows):
             pg.draw.line(self.display, self.grid_color, (0, row * self.block_height), (self.width, row * self.block_height))
+            pg.draw.line(self.display, self.grid_color, (0, row * self.block_height + (self.block_height - 1)), (self.width, row * self.block_height + (self.block_height - 1)))
         for col in range(self.num_columns):
             pg.draw.line(self.display, self.grid_color, (col * self.block_width, 0), (col * self.block_width, self.height))
+            pg.draw.line(self.display, self.grid_color, (col * self.block_width + (self.block_width - 1), 0), (col * self.block_width + (self.block_width - 1), self.height))
 
     def draw_board(self):
         for row in range(self.num_rows):
@@ -83,13 +87,15 @@ class Graphic():
         self.draw_grid()
         pg.display.update()
 
+    def tick(self):
+        self.clock.tick(self.fps)
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                quit()
+
 
 if __name__ == "__main__":
     board = np.array([[1, 0, 0, 0, 0, 0, 0, 0, 0, 3], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 0, 0, 0]])
     graphic = Graphic(600, (255, 0, 0), (255, 255,0),  (255, 255, 255), board)
     graphic.draw()
-    while True:
-        for event in pg.event.get():
-            if event.type == pg.QUIT:
-                pg.quit()
-                quit()
