@@ -53,5 +53,10 @@ class Engine:
         self.send_message(msg)
         return self.receive_message()
 
+    def ready(self):
+        msg = { "type": "Ready" }
+        self.send_message(msg)
+        return self.receive_message()
+
     def __del__(self):
         self.process.terminate()

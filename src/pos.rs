@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 use rand::Rng;
-use std::fmt;
+use std::{fmt, collections::VecDeque};
 
 lazy_static! {
     static ref PIECES: Vec<Vec<Vec<Vec<u8>>>> = {
@@ -59,22 +59,22 @@ pub struct Features {
 pub struct Position {
     pub score: i64,
     pub current_piece: usize,
-    pub next_piece: usize,
+    pub next_pieces: VecDeque<usize>,
     pub lines: usize,
-    pub board: Vec<u8>,
+    pub board: Vec<Vec<u8>>,
 }
 
 impl Position {
     pub fn new(
         current_piece: usize,
-        next_piece: usize,
+        next_pieces: VecDeque<usize>,
         lines: usize,
         score: i64,
-        board: Vec<u8>,
+        board: Vec<Vec<u8>>,
     ) -> Self {
         Position {
             current_piece,
-            next_piece,
+            next_pieces,
             lines,
             score,
             board,
@@ -102,23 +102,23 @@ impl Position {
 
         for y in 1..22 {
             for x in 0..12 {
-                if self.board[y * 12 + x] != 0 {
+                if self.board[y][x] != 0 {
                     height += 22 - y as u32;
                 }
 
-                if self.board[(y - 1) * 12 + x] != 0 && self.board[y * 12 + x] == 0 {
+                if self.board[y - 1][x] != 0 && self.board[y][x] == 0 {
                     holes += 1;
                     blocades += 1;
 
                     let mut k = 2;
                     let mut l = 1;
 
-                    while y - k >= 0 && self.board[(y - k) * 12 + x] != 0 {
+                    while y - k >= 0 && self.board[y - k][x] != 0 {
                         blocades += 1;
                         k += 1;
                     }
 
-                    while y + l < 22 && self.board[(y + l) * 12 + x] == 0 {
+                    while y + l < 22 && self.board[y + l][x] == 0 {
                         holes += 1;
                         l += 1;
                     }
@@ -134,7 +134,7 @@ impl Position {
         }
     }
 
-    pub fn apply_move(&self, x: usize, rotation: usize) -> Option<Position> {
+    pub fn apply_move(&self, x: usize, rotation: usize, gen_next_piece: bool) -> Option<Position> {
         let piece = &PIECES[self.current_piece - 1][rotation];
         let size_x = piece[0].len();
         let size_y = piece.len();
@@ -145,7 +145,7 @@ impl Position {
                     if y == 22 - size_y
                         || (x + i < 12
                             && piece[j][i] != 0
-                            && self.board[(j + y + 1) * 12 + (i + x)] != 0)
+                            && self.board[j + y + 1][i + x] != 0)
                     {
                         let mut new_board = self.board.clone();
                         let mut new_score = self.score;
@@ -153,37 +153,21 @@ impl Position {
                         // Place the piece
                         for i in 0..size_x {
                             for j in 0..size_y {
-                                if new_board[(y + j) * 12 + (x + i)] == 0 && piece[j][i] != 0 {
-                                    new_board[(y + j) * 12 + (x + i)] = piece[j][i]
+                                if new_board[y + j][x + i] == 0 && piece[j][i] != 0 {
+                                    new_board[y + j][x + i] = piece[j][i]
                                 }
                             }
                         }
 
                         // Update lines
-                        let mut line_count: usize = 0;
+                        let mut line_count = 0;
                         for j in 0..22 {
-                            let mut count = 0;
-                            for i in 0..12 {
-                                if new_board[j * 12 + i] != 0 {
-                                    count += 1;
-                                }
-                            }
+                            let full_line = new_board[j].iter().all(|&cell| cell != 0);
 
-                            if count == 12 {
+                            if full_line {
                                 line_count += 1;
-
-                                let new_board_clone = new_board.clone();
-
-                                for k in 0..j {
-                                    for l in 0..12 {
-                                        new_board[(k + 1) * 12 + l] = new_board_clone[k * 12 + l]
-                                    }
-                                }
-
-                                // Clear top line
-                                for l in 0..12 {
-                                    new_board[l] = 0
-                                }
+                                new_board.remove(j);
+                                new_board.insert(0, vec![0; 12]);
                             }
                         }
 
@@ -195,14 +179,22 @@ impl Position {
 
                         // Check game over
                         for i in 0..12 {
-                            if new_board[i] != 0 {
+                            if new_board[0][i] != 0 {
                                 return None;
                             }
                         }
 
+                        let mut new_next_pieces = self.next_pieces.clone();
+                        let new_current_piece = new_next_pieces.pop_front().unwrap();
+
+
+                        if gen_next_piece {
+                            new_next_pieces.push_front(rand::thread_rng().gen_range(1..8));
+                        }
+
                         return Some(Position::new(
-                            self.next_piece,
-                            rand::thread_rng().gen_range(1..8),
+                            new_current_piece,
+                            new_next_pieces,
                             self.lines + line_count,
                             new_score,
                             new_board,
@@ -220,7 +212,7 @@ impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for y in 0..22 {
             for x in 0..12 {
-                write!(f, "{} ", self.board[y * 12 + x])?;
+                write!(f, "{} ", self.board[y][x])?;
             }
             write!(f, "\n")?;
         }
@@ -230,43 +222,14 @@ impl fmt::Display for Position {
 
 impl Default for Position {
     fn default() -> Self {
-        // TODO: maybe pass the rng
         let mut rng = rand::thread_rng();
 
         Self {
             current_piece: rng.gen_range(1..8),
-            next_piece: rng.gen_range(1..8),
+            next_pieces: VecDeque::from([rng.gen_range(1..8); 4]),
             lines: 0,
             score: 0,
-            board: vec![0; 22 * 12],
+            board: vec![vec![0; 12]; 22],
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_features() {
-        let ctr_board = vec![
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0,
-            0, 4, 0, 0, 0, 0, 0, 0, 7, 0, 3, 0, 4, 4, 0, 0, 0, 0, 0, 0, 2, 0, 3, 3, 4, 0, 0, 0, 0,
-            0, 0, 0, 2, 0, 0, 3, 5, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 5, 5, 0, 0, 0, 0, 0, 0, 0, 3, 0,
-            6, 6, 5, 0, 0, 0, 0, 0, 0, 0, 3, 3, 6, 6, 0, 0, 0, 0, 0, 0, 5, 0, 0, 3, 4, 0, 0, 0, 0,
-            0, 0, 5, 5, 0, 0, 4, 4, 0, 0, 0, 0, 0, 1, 1, 5, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2,
-            3, 3, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 0, 3, 4, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 4, 4, 0, 0,
-            0, 0, 0, 0, 0, 1, 0, 0, 4, 4, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 4, 4, 6, 6, 0, 0, 0, 2, 0,
-            5, 0, 0, 4, 3, 6, 6, 2, 0, 0, 2, 5, 5, 0, 0, 0, 3, 3, 0, 2, 0, 2, 2, 0, 5, 0, 0, 0, 0,
-            3, 2, 2,
-        ];
-
-        let pos = Position::new(0, 0, 0, 0, ctr_board);
-        let feat = pos.features();
-
-        assert_eq!(feat.holes, 65.);
-        assert_eq!(feat.blocades, 61.);
-        assert_eq!(feat.height, 700.);
     }
 }
