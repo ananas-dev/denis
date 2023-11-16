@@ -119,7 +119,7 @@ if __name__ == "__main__":
     modify_config_file()
     # Tests on a game
     if not train: 
-        net = load_genome("winner.pkl")
+        net = load_genome("./models/strong.pkl")
         # Tests the best genome on a test game
         play_engine = engine.Engine("./target/release/neat-tetris")
 
@@ -138,9 +138,16 @@ if __name__ == "__main__":
             play_engine.go()
             pos = play_engine.peek()
 
-            graphic.board = np.array(pos["board"])
+            graphic.board = np.array(pos["board"]).reshape(22, 12)
+            graphic.current_piece = pos["current_piece"]
+            graphic.next_pieces = [pos["next_piece"]]
             graphic.score = pos["score"]
-            graphic.tick()
+
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    pg.quit()
+                    quit()
+
             graphic.draw()
 
         print("Game over !")
