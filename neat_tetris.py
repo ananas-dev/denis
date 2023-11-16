@@ -131,23 +131,20 @@ if __name__ == "__main__":
         play_engine.load(net.input_nodes, net.output_nodes, cleaned_node_evals)
 
         pos = play_engine.peek()
+        print(pos)
         board = np.array(pos["board"])
 
-        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board, 20)
+        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board, 2)
         while True:
             play_engine.go()
             pos = play_engine.peek()
 
             graphic.board = np.array(pos["board"]).reshape(22, 12)
             graphic.current_piece = pos["current_piece"]
-            graphic.next_pieces = [pos["next_piece"]]
+            graphic.next_pieces = pos["next_pieces"]
             graphic.score = pos["score"]
 
-            for event in pg.event.get():
-                if event.type == pg.QUIT:
-                    pg.quit()
-                    quit()
-
+            graphic.tick()
             graphic.draw()
 
         print("Game over !")

@@ -167,7 +167,7 @@ impl Position {
 
         if gen_next_piece {
             let rand = self.random_piece();
-            new_next_pieces.push_front(rand.0);
+            new_next_pieces.push_back(rand.0);
             new_bag = rand.1;
         }
 
@@ -181,6 +181,11 @@ impl Position {
                 new_pocket = Some(self.current_piece); 
                 let piece = &PIECES[new_current_piece - 1][rotation];
                 new_current_piece = new_next_pieces.pop_front().unwrap();
+                if gen_next_piece {
+                    let rand = self.random_piece();
+                    new_next_pieces.push_back(rand.0);
+                    new_bag = rand.1;
+                }
                 piece
             }
         };
@@ -294,9 +299,16 @@ impl Default for Position {
         let mut bag: Vec<usize> = (1..8).collect();
         bag.shuffle(&mut rng);
 
+        let current_piece = bag.pop().unwrap();
+
+        let mut next_pieces = VecDeque::with_capacity(4);
+        for _ in 0..4 {
+            next_pieces.push_back(bag.pop().unwrap());
+        }
+
         Self {
-            current_piece: bag.pop().unwrap(),
-            next_pieces: VecDeque::from([bag.pop().unwrap(); 4]),
+            current_piece,
+            next_pieces,
             lines: 0,
             score: 0,
             board: vec![vec![0; 12]; 22],
