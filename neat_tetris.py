@@ -9,7 +9,7 @@ import engine
 
 
 ### TRAINING PARAMETERS ###
-train = True
+train = False
 
 
 ##########################
@@ -46,36 +46,6 @@ def modify_config_file():
         lines[outputs_index] = f"num_outputs             = {num_outputs}\n"
         f.writelines(lines)
 
-
-### EVAL FUNCTION ###
-def convert_command(commands, num_columns):
-    command_1, command_2 = commands
-
-    # Converts to number of rotations
-    if command_1 <= -0.5:
-        command_1 = 0
-    elif -0.5 < command_1 <= 0:
-        command_1 = 1
-    elif 0 < command_1 <= 0.5:
-        command_1 = 2
-    else:
-        command_1 = 3
-
-    # Converts [-1, 1] to index of column [0, num_columns - 1]
-    command_2 = int((command_2 + 1) * (num_columns - 1) / 2)
-
-    return [command_1, command_2]
-
-def flatten_matrix(matrix):
-    """Flattens a matrix into a list
-
-    Args:
-        matrix (list): matrix to flatten
-
-    Returns:
-        list: flattened matrix
-    """
-    return [item for sublist in matrix for item in sublist]
 
 def eval_genome(genome, config):
     play_engine = engine.Engine("./target/release/neat-tetris")
@@ -131,7 +101,7 @@ if __name__ == "__main__":
     modify_config_file()
     # Tests on a game
     if not train: 
-        net = load_genome("winner.pkl")
+        net = load_genome("./models/strong.pkl")
         # Tests the best genome on a test game
         clock = pg.time.Clock()
         # t = tetris.Tetris()
@@ -155,6 +125,9 @@ if __name__ == "__main__":
             pos = play_engine.peek()
 
             graphic.board = np.array(pos["board"]).reshape(22, 12)
+            graphic.current_piece = pos["current_piece"]
+            graphic.next_pieces = [pos["next_piece"]]
+            graphic.score = pos["score"]
 
             for event in pg.event.get():
                 if event.type == pg.QUIT:
