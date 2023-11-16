@@ -1,6 +1,5 @@
 import os
 import threading
-import pygame as pg
 import numpy as np
 import neat
 import pickle # Used to save the model
@@ -9,7 +8,7 @@ import engine
 
 
 ### TRAINING PARAMETERS ###
-train = True
+train = False
 
 
 ##########################
@@ -17,9 +16,9 @@ train = True
 
 pop_size = 16
 fitness_threshold = 1000
-num_inputs = 22 * 12
+num_inputs = 4
 num_outputs = 1 # Score based on the 7 inputs
-num_generations = 100000
+num_generations = 1
 
 ##########################
 ##########################
@@ -66,17 +65,6 @@ def convert_command(commands, num_columns):
 
     return [command_1, command_2]
 
-def flatten_matrix(matrix):
-    """Flattens a matrix into a list
-
-    Args:
-        matrix (list): matrix to flatten
-
-    Returns:
-        list: flattened matrix
-    """
-    return [item for sublist in matrix for item in sublist]
-
 def eval_genome(genome, config):
     play_engine = engine.Engine("./target/release/neat-tetris")
 
@@ -113,7 +101,7 @@ def run(config_file, retrain=False):
     
     else:
         # Load the last checkpoint
-        checkpoints_filenames = [filename for filename in os.listdir(".") if filename.startswith("neat-checkpoint-")]
+        checkpoints_filenames = [filename for filename in os.listdir(".") if filename.startswith("neat-checkpoint-99")]
         checkpoints_filenames.sort()
         filename = checkpoints_filenames[-1]
         p = neat.Checkpointer.restore_checkpoint(filename)
@@ -133,8 +121,6 @@ if __name__ == "__main__":
     if not train: 
         net = load_genome("winner.pkl")
         # Tests the best genome on a test game
-        clock = pg.time.Clock()
-        # t = tetris.Tetris()
         play_engine = engine.Engine("./target/release/neat-tetris")
 
         cleaned_node_evals = []
@@ -145,22 +131,16 @@ if __name__ == "__main__":
         play_engine.load(net.input_nodes, net.output_nodes, cleaned_node_evals)
 
         pos = play_engine.peek()
-        board = np.array(pos["board"]).reshape(22, 12)
+        board = np.array(pos["board"])
 
-        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board)
+        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board, 20)
         while True:
-            clock.tick(10)
-
             play_engine.go()
             pos = play_engine.peek()
 
-            graphic.board = np.array(pos["board"]).reshape(22, 12)
-
-            for event in pg.event.get():
-                if event.type == pg.QUIT:
-                    pg.quit()
-                    quit()
-
+            graphic.board = np.array(pos["board"])
+            graphic.score = pos["score"]
+            graphic.tick()
             graphic.draw()
 
         print("Game over !")
@@ -170,4 +150,4 @@ if __name__ == "__main__":
 
     # Trains the model
     else:
-        run("config.txt", retrain=False)
+        run("config.txt", retrain=True)

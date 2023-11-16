@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
-use rand::Rng;
-use std::{fmt, collections::VecDeque};
+use rand::{seq::SliceRandom, thread_rng, Rng};
+use std::{collections::VecDeque, fmt, hash::{Hash, Hasher}};
 
 lazy_static! {
     static ref PIECES: Vec<Vec<Vec<Vec<u8>>>> = {
@@ -31,6 +31,11 @@ lazy_static! {
 
         pieces
     };
+    static ref ZOBRIST: Vec<u64> = {
+        let mut rng = thread_rng();
+
+        (0..(22 * 12)).map(|_| rng.gen()).collect()
+    };
 }
 
 fn rotate_matrix(matrix: &mut Vec<Vec<u8>>) {
@@ -60,6 +65,8 @@ pub struct Position {
     pub score: i64,
     pub current_piece: usize,
     pub next_pieces: VecDeque<usize>,
+    pub pocket: Option<usize>,
+    pub bag: Vec<usize>,
     pub lines: usize,
     pub board: Vec<Vec<u8>>,
 }
@@ -71,24 +78,41 @@ impl Position {
         lines: usize,
         score: i64,
         board: Vec<Vec<u8>>,
+        bag: Vec<usize>,
+        pocket: Option<usize>,
     ) -> Self {
         Position {
             current_piece,
             next_pieces,
             lines,
+            bag,
             score,
             board,
+            pocket,
         }
     }
 
-    pub fn gen_legal_moves(&self) -> Vec<(usize, usize)> {
+    pub fn gen_legal_moves(&self) -> Vec<(usize, usize, bool)> {
         let mut legal_moves = Vec::new();
 
         for rotation in 0..4 {
             let piece = &PIECES[self.current_piece - 1][rotation];
             let size_x = piece[0].len();
             for x in 0..(13 - size_x) {
-                legal_moves.push((x, rotation));
+                legal_moves.push((x, rotation, false));
+            }
+            if let Some(pocket_index) = self.pocket {
+                let piece = &PIECES[pocket_index - 1][rotation];
+                let size_x = piece[0].len();
+                for x in 0..(13 - size_x) {
+                    legal_moves.push((x, rotation, true));
+                }
+            } else if let Some(&next_piece) = self.next_pieces.get(0) {
+                let piece = &PIECES[next_piece - 1][rotation];
+                let size_x = piece[0].len();
+                for x in 0..(13 - size_x) {
+                    legal_moves.push((x, rotation, true));
+                }
             }
         }
 
@@ -134,8 +158,33 @@ impl Position {
         }
     }
 
-    pub fn apply_move(&self, x: usize, rotation: usize, gen_next_piece: bool) -> Option<Position> {
-        let piece = &PIECES[self.current_piece - 1][rotation];
+    pub fn apply_move(&self, x: usize, rotation: usize, swap: bool, gen_next_piece: bool) -> Option<Position> {
+        let mut new_next_pieces = self.next_pieces.clone();
+        let mut new_current_piece = new_next_pieces.pop_front().unwrap();
+
+        let mut new_bag = self.bag.clone();
+        let mut new_pocket = self.pocket.clone();
+
+        if gen_next_piece {
+            let rand = self.random_piece();
+            new_next_pieces.push_front(rand.0);
+            new_bag = rand.1;
+        }
+
+        let piece = {
+            if !swap {
+                &PIECES[self.current_piece - 1][rotation]
+            } else if let Some(pocket_index) = self.pocket {
+                new_pocket = Some(self.current_piece); 
+                &PIECES[pocket_index - 1][rotation]
+            } else {
+                new_pocket = Some(self.current_piece); 
+                let piece = &PIECES[new_current_piece - 1][rotation];
+                new_current_piece = new_next_pieces.pop_front().unwrap();
+                piece
+            }
+        };
+
         let size_x = piece[0].len();
         let size_y = piece.len();
 
@@ -143,9 +192,7 @@ impl Position {
             for i in 0..size_x {
                 for j in 0..size_y {
                     if y == 22 - size_y
-                        || (x + i < 12
-                            && piece[j][i] != 0
-                            && self.board[j + y + 1][i + x] != 0)
+                        || (x + i < 12 && piece[j][i] != 0 && self.board[j + y + 1][i + x] != 0)
                     {
                         let mut new_board = self.board.clone();
                         let mut new_score = self.score;
@@ -171,11 +218,13 @@ impl Position {
                             }
                         }
 
-                        new_score += 1000 * line_count as i64;
-
-                        // if y < 5 - size_y {
-                        //     new_score -= 500
-                        // }
+                        new_score += match line_count {
+                            1 => 40,
+                            2 => 100,
+                            3 => 300,
+                            4 => 1200,
+                            _ => 0,
+                        };
 
                         // Check game over
                         for i in 0..12 {
@@ -184,20 +233,14 @@ impl Position {
                             }
                         }
 
-                        let mut new_next_pieces = self.next_pieces.clone();
-                        let new_current_piece = new_next_pieces.pop_front().unwrap();
-
-
-                        if gen_next_piece {
-                            new_next_pieces.push_front(rand::thread_rng().gen_range(1..8));
-                        }
-
                         return Some(Position::new(
                             new_current_piece,
                             new_next_pieces,
                             self.lines + line_count,
                             new_score,
                             new_board,
+                            new_bag,
+                            new_pocket,
                         ));
                     }
                 }
@@ -205,6 +248,30 @@ impl Position {
         }
 
         None
+    }
+
+    fn random_piece(&self) -> (usize, Vec<usize>) {
+        let mut new_bag = self.bag.clone();
+
+        if new_bag.is_empty() {
+            new_bag = (1..8).collect();
+            new_bag.shuffle(&mut thread_rng());
+        }
+
+        (new_bag.pop().unwrap(), new_bag)
+    }
+
+    fn get_hash(&self) -> u64 {
+        let mut hash = 0;
+
+        for x in 0..12 {
+            for y in 0..22 {
+                let piece = self.board[y][x] as usize;
+                hash ^= ZOBRIST[(y * 22 + x) * (22 * 12) + piece];
+            }
+        }
+
+        hash
     }
 }
 
@@ -224,12 +291,27 @@ impl Default for Position {
     fn default() -> Self {
         let mut rng = rand::thread_rng();
 
+        let mut bag: Vec<usize> = (1..8).collect();
+        bag.shuffle(&mut rng);
+
         Self {
-            current_piece: rng.gen_range(1..8),
-            next_pieces: VecDeque::from([rng.gen_range(1..8); 4]),
+            current_piece: bag.pop().unwrap(),
+            next_pieces: VecDeque::from([bag.pop().unwrap(); 4]),
             lines: 0,
             score: 0,
             board: vec![vec![0; 12]; 22],
+            bag,
+            pocket: None,
         }
+    }
+}
+
+impl Hasher for Position {
+    fn finish(&self) -> u64 {
+        todo!()
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        todo!()
     }
 }

@@ -18,6 +18,8 @@ enum In {
         next_pieces: VecDeque<usize>,
         lines: usize,
         board: Vec<Vec<u8>>,
+        bag: Vec<usize>,
+        pocket: Option<usize>,
     },
     Peek,
     PlayGame,
@@ -38,6 +40,8 @@ enum Out {
         next_pieces: VecDeque<usize>,
         lines: usize,
         board: Vec<Vec<u8>>,
+        bag: Vec<usize>,
+        pocket: Option<usize>,
     },
     GameResult {
         score: i64,
@@ -56,6 +60,7 @@ pub fn start() -> io::Result<()> {
     let stdin = io::stdin(); // We get `Stdin` here.
     let mut pos: Position = Position::default();
     let mut net: Option<FeedForwardNetwork> = None;
+    let mut total_moves = 0;
 
     loop {
         buffer.clear();
@@ -80,13 +85,16 @@ pub fn start() -> io::Result<()> {
                 next_pieces,
                 lines,
                 board,
+                bag,
+                pocket,
             } => {
-                pos = Position::new(current_piece, next_pieces, lines, score, board);
+                pos = Position::new(current_piece, next_pieces, lines, score, board, bag, pocket);
+                total_moves = 0;
             }
             In::Go => {
                 if let Some(nn) = &mut net {
                     let best = search::find_best_move(nn, &pos);
-                    pos = pos.apply_move(best.0, best.1, true).unwrap();
+                    pos = pos.apply_move(best.0, best.1, best.2, true).unwrap();
                 }
             }
             In::Peek => {
@@ -97,21 +105,26 @@ pub fn start() -> io::Result<()> {
                         current_piece: pos.current_piece,
                         next_pieces: pos.next_pieces.clone(),
                         lines: pos.lines,
-                        board: pos.board.clone()
+                        board: pos.board.clone(),
+                        bag: pos.bag.clone(),
+                        pocket: pos.pocket,
                     })?
                 )
             }
             In::PlayGame => {
-                if let Some(nn) = &mut net {
-                    let mut best = search::find_best_move(nn, &pos);
-                    while let Some(new_pos) = pos.apply_move(best.0, best.1, true) {
-                        pos = new_pos;
-                        best = search::find_best_move(nn, &pos);
-                    }
+                if total_moves <= 500 {
+                    if let Some(nn) = &mut net {
+                        let mut best = search::find_best_move(nn, &pos);
+                        while let Some(new_pos) = pos.apply_move(best.0, best.1, best.2, true) {
+                            pos = new_pos;
+                            best = search::find_best_move(nn, &pos);
+                        }
 
-                    send(&Out::GameResult { score: pos.score })?;
-                    pos = Position::default();
-                }
+                        send(&Out::GameResult { score: pos.score })?;
+                        pos = Position::default();
+                        total_moves += 1;
+                    }
+                };
             },
             In::Ready => {
                 match net {

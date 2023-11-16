@@ -1,16 +1,16 @@
 use crate::{net::FeedForwardNetwork, pos::Position};
 
-pub fn find_best_move(net: &mut FeedForwardNetwork, pos: &Position) -> (usize, usize) {
+pub fn find_best_move(net: &mut FeedForwardNetwork, pos: &Position) -> (usize, usize, bool) {
     let mut maxscore = -f64::INFINITY;
-    let mut best_move = (0, 0);
+    let mut best_move = (0, 0, false);
 
-    for &(col, rot) in pos.gen_legal_moves().iter() {
-        if let Some(pos) = pos.apply_move(col, rot, false) {
-            let score = search(net, pos, 2);
+    for &(col, rot, swap) in pos.gen_legal_moves().iter() {
+        if let Some(pos) = pos.apply_move(col, rot, swap, false) {
+            let score = search(net, pos, 1);
 
             if score > maxscore {
                 maxscore = score;
-                best_move = (col, rot);
+                best_move = (col, rot, swap);
             }
         }
     }
@@ -32,8 +32,8 @@ fn search(net: &mut FeedForwardNetwork, pos: Position, depth: usize) -> f64 {
 
     let mut maxscore = -f64::INFINITY;
 
-    for &(col, rot) in pos.gen_legal_moves().iter() {
-        if let Some(pos) = pos.apply_move(col, rot, false) {
+    for &(col, rot, swap) in pos.gen_legal_moves().iter() {
+        if let Some(pos) = pos.apply_move(col, rot, swap, false) {
             let score = search(net, pos, depth - 1);
 
             if score > maxscore {
