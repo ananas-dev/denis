@@ -1,6 +1,9 @@
 use lazy_static::lazy_static;
 use rand::{seq::SliceRandom, thread_rng, Rng};
-use std::{collections::VecDeque, fmt, hash::{Hash, Hasher}};
+use std::{collections::VecDeque, fmt, hash::Hasher};
+
+const BOARD_WIDTH: usize = 10;
+const BOARD_HEIGHT: usize = 22;
 
 lazy_static! {
     static ref PIECES: Vec<Vec<Vec<Vec<u8>>>> = {
@@ -34,7 +37,7 @@ lazy_static! {
     static ref ZOBRIST: Vec<u64> = {
         let mut rng = thread_rng();
 
-        (0..(22 * 12)).map(|_| rng.gen()).collect()
+        (0..(BOARD_HEIGHT * BOARD_WIDTH)).map(|_| rng.gen()).collect()
     };
 }
 
@@ -55,9 +58,9 @@ fn rotate_matrix(matrix: &mut Vec<Vec<u8>>) {
 #[derive(Debug)]
 pub struct Features {
     pub holes: f64,
-    pub blocades: f64,
-    pub height: f64,
-    pub lines: f64,
+    pub bumpiness: f64,
+    pub aggregate_height: f64,
+    pub completed_lines: f64,
 }
 
 #[derive(Debug)]
@@ -98,19 +101,19 @@ impl Position {
         for rotation in 0..4 {
             let piece = &PIECES[self.current_piece - 1][rotation];
             let size_x = piece[0].len();
-            for x in 0..(13 - size_x) {
+            for x in 0..((BOARD_WIDTH + 1) - size_x) {
                 legal_moves.push((x, rotation, false));
             }
             if let Some(pocket_index) = self.pocket {
                 let piece = &PIECES[pocket_index - 1][rotation];
                 let size_x = piece[0].len();
-                for x in 0..(13 - size_x) {
+                for x in 0..((BOARD_WIDTH + 1) - size_x) {
                     legal_moves.push((x, rotation, true));
                 }
             } else if let Some(&next_piece) = self.next_pieces.get(0) {
                 let piece = &PIECES[next_piece - 1][rotation];
                 let size_x = piece[0].len();
-                for x in 0..(13 - size_x) {
+                for x in 0..((BOARD_WIDTH + 1) - size_x) {
                     legal_moves.push((x, rotation, true));
                 }
             }
@@ -121,28 +124,22 @@ impl Position {
 
     pub fn features(&self) -> Features {
         let mut holes = 0;
-        let mut blocades = 0;
-        let mut height = 0;
+        let mut aggregate_height = 0;
+        let mut heights: [f64; BOARD_WIDTH] = [0.; BOARD_WIDTH];
 
-        for y in 1..22 {
-            for x in 0..12 {
+        for y in 1..BOARD_HEIGHT {
+            for x in 0..BOARD_WIDTH {
                 if self.board[y][x] != 0 {
-                    height += 22 - y as u32;
+                    aggregate_height += BOARD_HEIGHT - y;
+                    heights[x] += 1.;
                 }
 
                 if self.board[y - 1][x] != 0 && self.board[y][x] == 0 {
                     holes += 1;
-                    blocades += 1;
 
-                    let mut k = 2;
                     let mut l = 1;
 
-                    while y - k >= 0 && self.board[y - k][x] != 0 {
-                        blocades += 1;
-                        k += 1;
-                    }
-
-                    while y + l < 22 && self.board[y + l][x] == 0 {
+                    while y + l < BOARD_HEIGHT && self.board[y + l][x] == 0 {
                         holes += 1;
                         l += 1;
                     }
@@ -150,11 +147,13 @@ impl Position {
             }
         }
 
+        let bumpiness = heights.windows(2).map(|window| (window[0] - window[1]).abs()).sum();
+
         Features {
             holes: holes as f64,
-            blocades: blocades as f64,
-            height: height as f64,
-            lines: self.lines as f64,
+            aggregate_height: aggregate_height as f64,
+            bumpiness,
+            completed_lines: self.lines as f64,
         }
     }
 
@@ -193,11 +192,11 @@ impl Position {
         let size_x = piece[0].len();
         let size_y = piece.len();
 
-        for y in 0..(23 - size_y) {
+        for y in 0..((BOARD_HEIGHT + 1) - size_y) {
             for i in 0..size_x {
                 for j in 0..size_y {
-                    if y == 22 - size_y
-                        || (x + i < 12 && piece[j][i] != 0 && self.board[j + y + 1][i + x] != 0)
+                    if y == BOARD_HEIGHT - size_y
+                        || (x + i < BOARD_WIDTH && piece[j][i] != 0 && self.board[j + y + 1][i + x] != 0)
                     {
                         let mut new_board = self.board.clone();
                         let mut new_score = self.score;
@@ -213,13 +212,13 @@ impl Position {
 
                         // Update lines
                         let mut line_count = 0;
-                        for j in 0..22 {
+                        for j in 0..BOARD_HEIGHT {
                             let full_line = new_board[j].iter().all(|&cell| cell != 0);
 
                             if full_line {
                                 line_count += 1;
                                 new_board.remove(j);
-                                new_board.insert(0, vec![0; 12]);
+                                new_board.insert(0, vec![0; BOARD_WIDTH]);
                             }
                         }
 
@@ -232,8 +231,8 @@ impl Position {
                         };
 
                         // Check game over
-                        for i in 0..12 {
-                            if new_board[0][i] != 0 {
+                        for i in 0..BOARD_WIDTH {
+                            if new_board[0][i] != 0 || new_board[1][i] != 0 {
                                 return None;
                             }
                         }
@@ -269,10 +268,10 @@ impl Position {
     fn get_hash(&self) -> u64 {
         let mut hash = 0;
 
-        for x in 0..12 {
-            for y in 0..22 {
+        for x in 0..BOARD_WIDTH {
+            for y in 0..BOARD_HEIGHT {
                 let piece = self.board[y][x] as usize;
-                hash ^= ZOBRIST[(y * 22 + x) * (22 * 12) + piece];
+                // hash ^= ZOBRIST[(y * BOARD_HEIGHT + x) * (22 * BOARD_WIDTH) + piece];
             }
         }
 
@@ -282,8 +281,8 @@ impl Position {
 
 impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for y in 0..22 {
-            for x in 0..12 {
+        for y in 0..BOARD_HEIGHT {
+            for x in 0..BOARD_WIDTH {
                 write!(f, "{} ", self.board[y][x])?;
             }
             write!(f, "\n")?;
@@ -311,7 +310,7 @@ impl Default for Position {
             next_pieces,
             lines: 0,
             score: 0,
-            board: vec![vec![0; 12]; 22],
+            board: vec![vec![0; BOARD_WIDTH]; BOARD_HEIGHT],
             bag,
             pocket: None,
         }

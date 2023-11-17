@@ -1,5 +1,4 @@
 import os
-import threading
 import numpy as np
 import neat
 import pickle # Used to save the model
@@ -18,7 +17,7 @@ pop_size = 16
 fitness_threshold = 1000
 num_inputs = 4
 num_outputs = 1 # Score based on the 7 inputs
-num_generations = 1
+num_generations = 10000
 
 ##########################
 ##########################
@@ -108,7 +107,7 @@ def run(config_file, retrain=False):
     
     p.add_reporter(neat.StdOutReporter(True))
     p.add_reporter(neat.StatisticsReporter())
-    p.add_reporter(neat.Checkpointer(100, None)) # Saves the model every two generations
+    p.add_reporter(neat.Checkpointer(10, None)) # Saves the model every two generations
 
     evaluator = neat.ParallelEvaluator(16, eval_genome)
 
@@ -139,7 +138,7 @@ if __name__ == "__main__":
             play_engine.go()
             pos = play_engine.peek()
 
-            graphic.board = np.array(pos["board"]).reshape(22, 12)
+            graphic.board = np.array(pos["board"]).reshape(22, 10)
             graphic.current_piece = pos["current_piece"]
             graphic.next_pieces = pos["next_pieces"]
             graphic.score = pos["score"]
@@ -155,4 +154,4 @@ if __name__ == "__main__":
 
     # Trains the model
     else:
-        run("config.txt", retrain=True)
+        run("config.txt", retrain=False)
