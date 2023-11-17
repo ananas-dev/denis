@@ -134,7 +134,7 @@ if __name__ == "__main__":
         print(pos)
         board = np.array(pos["board"])
 
-        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board, 2)
+        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board,10)
         while True:
             play_engine.go()
             pos = play_engine.peek()
@@ -143,6 +143,7 @@ if __name__ == "__main__":
             graphic.current_piece = pos["current_piece"]
             graphic.next_pieces = pos["next_pieces"]
             graphic.score = pos["score"]
+            graphic.pocket = pos["pocket"]
 
             graphic.tick()
             graphic.draw()

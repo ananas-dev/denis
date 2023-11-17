@@ -11,6 +11,7 @@ class Graphic():
         self.board = board
         self.current_piece = -1
         self.next_pieces = []
+        self.pocket = None
         self.score = 0
         self.num_columns, self.num_rows = board.shape[1], board.shape[0]
         self.width = width
@@ -103,28 +104,28 @@ class Graphic():
             pg.draw.rect(self.display, color=color, rect=((self.num_columns+3)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
 
         elif piece == 2: # J
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1.5)*self.block_width, row*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
 
         elif piece == 3: # S
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, row*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3.5)*self.block_width, row*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
 
         elif piece == 4: # Z
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1.5)*self.block_width, row*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, row*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
         
         elif piece == 5: # T
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, row*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
+            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
         
         elif piece == 6: # O
             pg.draw.rect(self.display, color=color, rect=((self.num_columns+2)*self.block_width, row*self.block_height, self.block_width, self.block_height))
@@ -147,6 +148,8 @@ class Graphic():
             next_pieces (list): list of id corresponding to the n next pieces
         """
         self.draw_piece(self.current_piece, 1)
+        if self.pocket != None:
+            self.draw_piece(self.pocket, 18)
         pg.draw.rect(self.display, self.grid_color, ((self.num_columns+1)*self.block_width, self.block_height, (self.side_panel_cols-2)*self.block_width, 2*self.block_height), 2)
         pg.draw.rect(self.display, self.grid_color, ((self.num_columns+1)*self.block_width, 4*self.block_height, (self.side_panel_cols-2)*self.block_width, 12*self.block_height), 2)
         for i, piece in enumerate(self.next_pieces):
