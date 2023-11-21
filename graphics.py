@@ -11,7 +11,6 @@ class Graphic():
         self.board = board
         self.current_piece = -1
         self.next_pieces = []
-        self.pocket = None
         self.score = 0
         self.num_columns, self.num_rows = board.shape[1], board.shape[0]
         self.width = width
@@ -148,8 +147,6 @@ class Graphic():
             next_pieces (list): list of id corresponding to the n next pieces
         """
         self.draw_piece(self.current_piece, 1)
-        if self.pocket != None:
-            self.draw_piece(self.pocket, 18)
         pg.draw.rect(self.display, self.grid_color, ((self.num_columns+1)*self.block_width, self.block_height, (self.side_panel_cols-2)*self.block_width, 2*self.block_height), 2)
         pg.draw.rect(self.display, self.grid_color, ((self.num_columns+1)*self.block_width, 4*self.block_height, (self.side_panel_cols-2)*self.block_width, 11*self.block_height), 2)
         for i, piece in enumerate(self.next_pieces):

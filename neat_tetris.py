@@ -140,9 +140,8 @@ if __name__ == "__main__":
 
             graphic.board = np.array(pos["board"]).reshape(22, 10)
             graphic.current_piece = pos["current_piece"]
-            graphic.next_pieces = pos["next_pieces"]
+            graphic.next_pieces = [pos["next_piece"]]
             graphic.score = pos["score"]
-            graphic.pocket = pos["pocket"]
 
             graphic.tick()
             graphic.draw()

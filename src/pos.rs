@@ -1,58 +1,113 @@
 use lazy_static::lazy_static;
-use rand::{seq::SliceRandom, thread_rng, Rng};
-use std::{collections::VecDeque, fmt, hash::Hasher};
+use rand::Rng;
+use std::{fmt, hash::Hasher};
 
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 22;
 
 lazy_static! {
-    static ref PIECES: Vec<Vec<Vec<Vec<u8>>>> = {
-        let piece_shapes: Vec<Vec<Vec<u8>>> = vec![
-            vec![vec![0, 0, 1], vec![1, 1, 1]],
-            vec![vec![2, 0, 0], vec![2, 2, 2]],
-            vec![vec![0, 3, 3], vec![3, 3, 0]],
-            vec![vec![4, 4, 0], vec![0, 4, 4]],
-            vec![vec![0, 5, 0], vec![5, 5, 5]],
-            vec![vec![6, 6], vec![6, 6]],
-            vec![vec![7, 7, 7, 7]],
-        ];
-
-        let mut pieces = Vec::new();
-
-        for piece_number in 1..8 {
-            let mut rotations = Vec::new();
-            let mut last_shape = piece_shapes[piece_number - 1].clone();
-            rotations.push(last_shape.clone());
-
-            for _ in 1..4 {
-                rotate_matrix(&mut last_shape);
-                rotations.push(last_shape.clone());
-            }
-
-            pieces.push(rotations);
-        }
-
-        pieces
-    };
-    static ref ZOBRIST: Vec<u64> = {
-        let mut rng = thread_rng();
-
-        (0..(BOARD_HEIGHT * BOARD_WIDTH)).map(|_| rng.gen()).collect()
-    };
-}
-
-fn rotate_matrix(matrix: &mut Vec<Vec<u8>>) {
-    let n = matrix.len();
-    let m = matrix[0].len();
-    let mut result = vec![vec![0; n]; m];
-
-    for i in 0..n {
-        for j in 0..m {
-            result[j][n - 1 - i] = matrix[i][j];
-        }
-    }
-
-    *matrix = result;
+    #[rustfmt::skip]
+    static ref PIECES: Vec<Vec<Vec<Vec<usize>>>> = vec![
+        vec![
+            vec![
+                vec![1, 1, 1, 1]
+            ],
+            vec![
+                vec![1],
+                vec![1],
+                vec![1],
+                vec![1],
+            ],
+        ],
+        vec![
+            vec![
+                vec![2, 2],
+                vec![2, 2]
+            ]
+        ],
+        vec![
+            vec![
+                vec![3, 3, 3],
+                vec![0, 3, 1],
+            ],
+            vec![
+                vec![0, 3],
+                vec![0, 3],
+                vec![3, 3],
+            ],
+            vec![
+                vec![3, 0, 0],
+                vec![3, 3, 3],
+            ],
+            vec![
+                vec![3, 3],
+                vec![3, 3],
+                vec![3, 3],
+            ],
+        ],
+        vec![
+            vec![
+                vec![4, 4, 4],
+                vec![4, 0, 0],
+            ],
+            vec![
+                vec![4, 4],
+                vec![0, 4],
+                vec![0, 4],
+            ],
+            vec![
+                vec![0, 0, 4],
+                vec![4, 4, 4],
+            ],
+            vec![
+                vec![4, 0],
+                vec![4, 0],
+                vec![4, 4],
+            ],
+        ],
+        vec![
+            vec![
+                vec![0, 5, 5],
+                vec![5, 5, 0],
+            ],
+            vec![
+                vec![5, 0],
+                vec![5, 5],
+                vec![0, 5],
+            ],
+        ],
+        vec![
+            vec![
+                vec![6, 6, 6],
+                vec![0, 6, 0],
+            ],
+            vec![
+                vec![0, 6],
+                vec![6, 6],
+                vec![0, 6],
+            ],
+            vec![
+                vec![0, 6, 0],
+                vec![6, 6, 6],
+            ],
+            vec![
+                vec![6, 0],
+                vec![6, 6],
+                vec![6, 0],
+            ],
+        ],
+        vec![
+            vec![
+                vec![7, 7, 0],
+                vec![0, 7, 7],
+            ],
+            vec![
+                vec![0, 7],
+                vec![7, 7],
+                vec![7, 0],
+            ],
+        ],
+    ];
 }
 
 #[derive(Debug)]
@@ -67,55 +122,37 @@ pub struct Features {
 pub struct Position {
     pub score: i64,
     pub current_piece: usize,
-    pub next_pieces: VecDeque<usize>,
-    pub pocket: Option<usize>,
-    pub bag: Vec<usize>,
+    pub next_piece: usize,
     pub lines: usize,
-    pub board: Vec<Vec<u8>>,
+    pub board: Vec<Vec<usize>>,
 }
 
 impl Position {
     pub fn new(
         current_piece: usize,
-        next_pieces: VecDeque<usize>,
+        next_piece: usize,
         lines: usize,
         score: i64,
-        board: Vec<Vec<u8>>,
-        bag: Vec<usize>,
-        pocket: Option<usize>,
+        board: Vec<Vec<usize>>,
     ) -> Self {
         Position {
             current_piece,
-            next_pieces,
+            next_piece,
             lines,
-            bag,
             score,
             board,
-            pocket,
         }
     }
 
-    pub fn gen_legal_moves(&self) -> Vec<(usize, usize, bool)> {
+    pub fn gen_legal_moves(&self) -> Vec<(usize, usize)> {
         let mut legal_moves = Vec::new();
 
-        for rotation in 0..4 {
-            let piece = &PIECES[self.current_piece - 1][rotation];
+        let piece_type = &PIECES[self.current_piece - 1];
+
+        for (rotation, piece) in piece_type.iter().enumerate() {
             let size_x = piece[0].len();
-            for x in 0..((BOARD_WIDTH + 1) - size_x) {
-                legal_moves.push((x, rotation, false));
-            }
-            if let Some(pocket_index) = self.pocket {
-                let piece = &PIECES[pocket_index - 1][rotation];
-                let size_x = piece[0].len();
-                for x in 0..((BOARD_WIDTH + 1) - size_x) {
-                    legal_moves.push((x, rotation, true));
-                }
-            } else if let Some(&next_piece) = self.next_pieces.get(0) {
-                let piece = &PIECES[next_piece - 1][rotation];
-                let size_x = piece[0].len();
-                for x in 0..((BOARD_WIDTH + 1) - size_x) {
-                    legal_moves.push((x, rotation, true));
-                }
+            for x in 0..(BOARD_WIDTH + 1 - size_x) {
+                legal_moves.push((x, rotation));
             }
         }
 
@@ -147,7 +184,10 @@ impl Position {
             }
         }
 
-        let bumpiness = heights.windows(2).map(|window| (window[0] - window[1]).abs()).sum();
+        let bumpiness = heights
+            .windows(2)
+            .map(|window| (window[0] - window[1]).abs())
+            .sum();
 
         Features {
             holes: holes as f64,
@@ -157,38 +197,8 @@ impl Position {
         }
     }
 
-    pub fn apply_move(&self, x: usize, rotation: usize, swap: bool, gen_next_piece: bool) -> Option<Position> {
-        let mut new_next_pieces = self.next_pieces.clone();
-        let mut new_current_piece = new_next_pieces.pop_front().unwrap();
-
-        let mut new_bag = self.bag.clone();
-        let mut new_pocket = self.pocket.clone();
-
-        if gen_next_piece {
-            let rand = self.random_piece();
-            new_next_pieces.push_back(rand.0);
-            new_bag = rand.1;
-        }
-
-        let piece = {
-            if !swap {
-                &PIECES[self.current_piece - 1][rotation]
-            } else if let Some(pocket_index) = self.pocket {
-                new_pocket = Some(self.current_piece); 
-                &PIECES[pocket_index - 1][rotation]
-            } else {
-                new_pocket = Some(self.current_piece); 
-                let piece = &PIECES[new_current_piece - 1][rotation];
-                new_current_piece = new_next_pieces.pop_front().unwrap();
-                if gen_next_piece {
-                    let rand = self.random_piece();
-                    new_next_pieces.push_back(rand.0);
-                    new_bag = rand.1;
-                }
-                piece
-            }
-        };
-
+    pub fn apply_move(&self, x: usize, rotation: usize) -> Option<Position> {
+        let piece = &PIECES[self.current_piece - 1][rotation];
         let size_x = piece[0].len();
         let size_y = piece.len();
 
@@ -196,7 +206,9 @@ impl Position {
             for i in 0..size_x {
                 for j in 0..size_y {
                     if y == BOARD_HEIGHT - size_y
-                        || (x + i < BOARD_WIDTH && piece[j][i] != 0 && self.board[j + y + 1][i + x] != 0)
+                        || (x + i < BOARD_WIDTH
+                            && piece[j][i] != 0
+                            && self.board[j + y + 1][i + x] != 0)
                     {
                         let mut new_board = self.board.clone();
                         let mut new_score = self.score;
@@ -238,13 +250,11 @@ impl Position {
                         }
 
                         return Some(Position::new(
-                            new_current_piece,
-                            new_next_pieces,
+                            self.next_piece,
+                            rand::thread_rng().gen_range(1..8),
                             self.lines + line_count,
                             new_score,
                             new_board,
-                            new_bag,
-                            new_pocket,
                         ));
                     }
                 }
@@ -252,17 +262,6 @@ impl Position {
         }
 
         None
-    }
-
-    fn random_piece(&self) -> (usize, Vec<usize>) {
-        let mut new_bag = self.bag.clone();
-
-        if new_bag.is_empty() {
-            new_bag = (1..8).collect();
-            new_bag.shuffle(&mut thread_rng());
-        }
-
-        (new_bag.pop().unwrap(), new_bag)
     }
 
     fn get_hash(&self) -> u64 {
@@ -295,24 +294,12 @@ impl Default for Position {
     fn default() -> Self {
         let mut rng = rand::thread_rng();
 
-        let mut bag: Vec<usize> = (1..8).collect();
-        bag.shuffle(&mut rng);
-
-        let current_piece = bag.pop().unwrap();
-
-        let mut next_pieces = VecDeque::with_capacity(4);
-        for _ in 0..4 {
-            next_pieces.push_back(bag.pop().unwrap());
-        }
-
         Self {
-            current_piece,
-            next_pieces,
+            current_piece: rng.gen_range(1..8),
+            next_piece: rng.gen_range(1..8),
             lines: 0,
             score: 0,
             board: vec![vec![0; BOARD_WIDTH]; BOARD_HEIGHT],
-            bag,
-            pocket: None,
         }
     }
 }
