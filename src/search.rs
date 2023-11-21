@@ -22,16 +22,12 @@ fn search(net: &mut FeedForwardNetwork, pos: Position, depth: usize) -> f64 {
     if depth == 0 {
         let features = pos.features();
 
-        return -0.510066 * features.aggregate_height
-            + 0.760666 * features.completed_lines
-            + -0.35663 * features.holes
-            + -0.184483 * features.bumpiness;
-        // return net.activate(vec![
-        //     features.completed_lines,
-        //     features.holes,
-        //     features.bumpiness,
-        //     features.aggregate_height,
-        // ])[0];
+        return net.activate(vec![
+            features.completed_lines,
+            features.holes,
+            features.bumpiness,
+            features.aggregate_height,
+        ])[0];
     }
 
     let mut maxscore = -f64::INFINITY;
