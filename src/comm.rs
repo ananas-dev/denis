@@ -88,6 +88,7 @@ pub fn start() -> io::Result<()> {
             In::Go => {
                 if let Some(nn) = &mut net {
                     let best = search::find_best_move(nn, &pos);
+                    pos.lines = 0;
                     pos = pos.apply_move(best.0, best.1).unwrap();
                 }
             }
@@ -109,6 +110,7 @@ pub fn start() -> io::Result<()> {
                         let mut best = search::find_best_move(nn, &pos);
                         while let Some(new_pos) = pos.apply_move(best.0, best.1) {
                             pos = new_pos;
+                            pos.lines = 0;
                             best = search::find_best_move(nn, &pos);
                         }
 
