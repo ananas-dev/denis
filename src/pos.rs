@@ -28,7 +28,7 @@ lazy_static! {
         vec![
             vec![
                 vec![3, 3, 3],
-                vec![0, 3, 1],
+                vec![0, 0, 3],
             ],
             vec![
                 vec![0, 3],
@@ -41,8 +41,8 @@ lazy_static! {
             ],
             vec![
                 vec![3, 3],
-                vec![3, 3],
-                vec![3, 3],
+                vec![3, 0],
+                vec![3, 0],
             ],
         ],
         vec![
