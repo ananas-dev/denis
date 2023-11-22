@@ -271,6 +271,8 @@ impl Position {
                             ) {
                                 legal_moves.push((x, y, rot));
                             }
+
+                            cache.clear();
                         } else {
                             legal_moves.push((x, y, rot));
                         }
