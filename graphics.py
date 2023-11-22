@@ -1,6 +1,120 @@
 import pygame as pg
 import numpy as np
 
+PIECES = [
+    [
+        np.array([
+            [1, 1, 1, 1]
+        ]),
+        np.array([
+            [1],
+            [1],
+            [1],
+            [1],
+        ]),
+    ],
+    [
+        np.array([
+            [1, 1],
+            [1, 1]
+        ])
+    ],
+    [
+        np.array([
+            [1, 1, 1],
+            [0, 0, 1],
+        ]),
+        np.array([
+            [0, 1],
+            [0, 1],
+            [1, 1],
+        ]),
+        np.array([
+            [1, 0, 0],
+            [1, 1, 1],
+        ]),
+        np.array([
+            [1, 1],
+            [1, 0],
+            [1, 0],
+        ]),
+    ],
+    [
+        np.array([
+            [1, 1, 1],
+            [1, 0, 0],
+        ]),
+        np.array([
+            [1, 1],
+            [0, 1],
+            [0, 1],
+        ]),
+        np.array([
+            [0, 0, 1],
+            [1, 1, 1],
+        ]),
+        np.array([
+            [1, 0],
+            [1, 0],
+            [1, 1],
+        ]),
+    ],
+    [
+        np.array([
+            [0, 1, 1],
+            [1, 1, 0],
+        ]),
+        np.array([
+            [1, 0],
+            [1, 1],
+            [0, 1],
+        ]),
+    ],
+    [
+        np.array([
+            [1, 1, 1],
+            [0, 1, 0],
+        ]),
+        np.array([
+            [0, 1],
+            [1, 1],
+            [0, 1],
+        ]),
+        np.array([
+            [0, 1, 0],
+            [1, 1, 1],
+        ]),
+        np.array([
+            [1, 0],
+            [1, 1],
+            [1, 0],
+        ]),
+    ],
+    [
+        np.array([
+            [1, 1, 0],
+            [0, 1, 1],
+        ]),
+        np.array([
+            [0, 1],
+            [1, 1],
+            [1, 0],
+        ]),
+    ],
+]
+
+ROTATION_TABLE = [
+    [(2, -2), (-2, 2)], # I
+    [(0, 0)], # O
+    [(0, -1), (0, 0), (1, 0), (-1, 1)], # J
+    [(0, -1), (0, 0), (1, 0), (-1, 1)], # L
+    [(1, -1), (-1, 1)], # S
+    [(0, -1), (0, 0), (1, 0), (-1, 1)], # T
+    [(1, -1), (-1, 1)], # Z
+]
+
+SPAWNS = [(3, 3), (2, 4), (2, 3), (2, 3), (2, 3), (2, 3), (2, 3)]
+
 class Graphic():
 
     def __init__(self, width, bg_color_1, bg_color_2, grid_color, board, fps=10):
@@ -11,6 +125,7 @@ class Graphic():
         self.board = board
         self.current_piece = -1
         self.next_pieces = []
+        self.action_list = []
         self.score = 0
         self.num_columns, self.num_rows = board.shape[1], board.shape[0]
         self.width = width
@@ -74,6 +189,12 @@ class Graphic():
                 fn_line(surface, color, (col,y1), (col,y2))
 
 
+    def draw_bg(self):
+        self.fill_gradient(self.display, self.bg_color_1, self.bg_color_2)
+        self.draw_grid()
+        self.show_score()
+        self.draw_side_panel_pieces()
+
     def draw_grid(self):
         for row in range(2, self.num_rows+1):
             pg.draw.line(self.display, self.grid_color, (0, row * self.block_height), (self.width, row * self.block_height), 2)
@@ -88,69 +209,33 @@ class Graphic():
                     pg.draw.rect(self.display, color, (col * self.block_width, row * self.block_height, self.block_width, self.block_height), 0)
 
 
-    def draw_piece(self, piece, row):
+    def draw_piece(self, piece, pos, rotation):
         """Draws a piece on the board
 
         Args:
             piece (int): piece to draw
-            pos (tuple): row and columns where to draw the piece in the side panel (0, 0) is the top left corner of the side panel
+            pos (tuple): row and columns where to draw the piece on the board
+            rotation (int): rotation of the piece
         """
         color = self.ID_2_RGB[piece]
-        if piece == 1: # L
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3.5)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-
-        elif piece == 2: # J
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1.5)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-
-        elif piece == 3: # S
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3.5)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-
-        elif piece == 4: # Z
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1.5)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
+        row, col = pos
+        p = PIECES[piece-1]
+        rotation = rotation%len(p)
+        p = p[rotation]
+        for i in range(p.shape[0]):
+            for j in range(p.shape[1]):
+                if p[i][j] != 0:
+                    pg.draw.rect(self.display, color, ((col+j) * self.block_width, (row+i) * self.block_height, self.block_width, self.block_height), 0)
         
-        elif piece == 5: # T
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3.5)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-        
-        elif piece == 6: # O
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3)*self.block_width, (row+1)*self.block_height, self.block_width, self.block_height))
-        
-        elif piece == 7: # I
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+1)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+2)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+3)*self.block_width, row*self.block_height, self.block_width, self.block_height))
-            pg.draw.rect(self.display, color=color, rect=((self.num_columns+4)*self.block_width, row*self.block_height, self.block_width, self.block_height))
 
-
-    def draw_pieces(self):
+    def draw_side_panel_pieces(self):
         """Draws current piece and next pieces on the side panel
-
-        Args:
-            current_piece (int): id of the current piece
-            next_pieces (list): list of id corresponding to the n next pieces
         """
-        self.draw_piece(self.current_piece, 1)
+        self.draw_piece(self.current_piece, (1, self.num_columns+1), rotation=0)
         pg.draw.rect(self.display, self.grid_color, ((self.num_columns+1)*self.block_width, self.block_height, (self.side_panel_cols-2)*self.block_width, 2*self.block_height), 2)
         pg.draw.rect(self.display, self.grid_color, ((self.num_columns+1)*self.block_width, 4*self.block_height, (self.side_panel_cols-2)*self.block_width, 11*self.block_height), 2)
         for i, piece in enumerate(self.next_pieces):
-            self.draw_piece(piece, 3*i+4)
+            self.draw_piece(piece, (3*i+4, self.num_columns+1), rotation=1)
 
 
     def show_score(self):
@@ -159,12 +244,30 @@ class Graphic():
         self.display.blit(score_text, pos)
         
 
+    def animate_piece(self):
+        """Animates the piece falling down the board
+
+        Args:
+            action_list (list): list of actions to perform
+        """
+        x_offset, y_offset = SPAWNS[self.current_piece-1]
+        rot = 0
+        self.draw_piece(self.current_piece, (x_offset, y_offset), rotation=rot)
+        pg.display.update()
+        for dx, dy, dr in self.action_list:
+            x_offset += dx
+            y_offset += dy
+            y_offset += 1
+            rot += dr
+            self.draw_bg()
+            self.draw_piece(self.current_piece, (y_offset, x_offset), rotation=rot)
+            pg.display.update()
+            self.tick()
+
     def draw(self):
-        self.fill_gradient(self.display, self.bg_color_1, self.bg_color_2)
+        self.draw_bg()
+        self.animate_piece()
         self.draw_board()
-        self.draw_grid()
-        self.show_score()
-        self.draw_pieces()
         pg.display.update()
 
     def tick(self):
@@ -177,12 +280,11 @@ class Graphic():
 
 if __name__ == "__main__":
     board = np.zeros((22, 10))
-    board[-1] = np.ones(10)
-    board[-2] = np.ones(10) + 2
-    graphic = Graphic(300, (0, 0, 0), (0, 0,0),  (255, 255, 255), board)
+    graphic = Graphic(200, (0, 0, 0), (0, 0,0),  (255, 255, 255), board)
     graphic.current_piece = 3
     graphic.score = 123456789000
-    graphic.next_pieces = [4, 6, 6]
+    graphic.next_pieces = [3]
+    graphic.action_list = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1)]
     while True:
         graphic.draw()
         graphic.tick()
