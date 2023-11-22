@@ -107,6 +107,7 @@ pub fn start() -> io::Result<()> {
             In::PlayGame => {
                 if total_moves <= 500 {
                     if let Some(nn) = &mut net {
+                        pos.lines = 0;
                         let mut best = search::find_best_move(nn, &pos);
                         while let Some(new_pos) = pos.apply_move(best.0, best.1) {
                             pos = new_pos;

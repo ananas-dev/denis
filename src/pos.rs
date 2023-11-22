@@ -161,14 +161,12 @@ impl Position {
 
     pub fn features(&self) -> Features {
         let mut holes = 0;
-        let mut aggregate_height = 0;
         let mut heights: [f64; BOARD_WIDTH] = [0.; BOARD_WIDTH];
 
-        for y in 1..BOARD_HEIGHT {
+        for y in (1..BOARD_HEIGHT).rev() {
             for x in 0..BOARD_WIDTH {
                 if self.board[y][x] != 0 {
-                    aggregate_height += BOARD_HEIGHT - y;
-                    heights[x] += 1.;
+                    heights[x] = (BOARD_HEIGHT - y) as f64;
                 }
 
                 if self.board[y - 1][x] != 0 && self.board[y][x] == 0 {
@@ -189,9 +187,11 @@ impl Position {
             .map(|window| (window[0] - window[1]).abs())
             .sum();
 
+        let aggregate_height = heights.iter().sum();
+
         Features {
             holes: holes as f64,
-            aggregate_height: aggregate_height as f64,
+            aggregate_height,
             bumpiness,
             completed_lines: self.lines as f64,
         }
@@ -311,5 +311,44 @@ impl Hasher for Position {
 
     fn write(&mut self, bytes: &[u8]) {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn features() {
+        let board = vec![
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+            vec![0, 1, 1, 1, 1, 1, 1, 0, 0, 1],
+            vec![0, 1, 1, 0, 1, 1, 1, 1, 1, 1],
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            vec![1, 1, 1, 0, 1, 1, 1, 1, 1, 1],
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        ];
+
+        let feat = Position::new(1, 1, 0, 0, board).features();
+
+        assert_eq!(feat.bumpiness, 6.);
+        assert_eq!(feat.aggregate_height, 48.);
+        assert_eq!(feat.holes, 2.);
     }
 }
