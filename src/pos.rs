@@ -197,6 +197,22 @@ impl Position {
         }
     }
 
+    fn gen_piece(prev: usize) -> usize {
+        let mut next_piece = rand::thread_rng().gen_range(1..8);
+
+        if next_piece == prev {
+            let reroll = rand::thread_rng().gen_range(1..7);
+
+            if reroll < next_piece {
+                next_piece = reroll;
+            } else {
+                next_piece = reroll + 1;
+            }
+        }
+
+        next_piece
+    }
+
     pub fn apply_move(&self, x: usize, rotation: usize) -> Option<Position> {
         let piece = &PIECES[self.current_piece - 1][rotation];
         let size_x = piece[0].len();
@@ -249,9 +265,11 @@ impl Position {
                             }
                         }
 
+                        let mut next_piece = rand::thread_rng().gen_range(1..8);
+
                         return Some(Position::new(
                             self.next_piece,
-                            rand::thread_rng().gen_range(1..8),
+                            Position::gen_piece(self.next_piece),
                             self.lines + line_count,
                             new_score,
                             new_board,
@@ -292,11 +310,11 @@ impl fmt::Display for Position {
 
 impl Default for Position {
     fn default() -> Self {
-        let mut rng = rand::thread_rng();
+        let current_piece = Position::gen_piece(0);
 
         Self {
-            current_piece: rng.gen_range(1..8),
-            next_piece: rng.gen_range(1..8),
+            current_piece: Position::gen_piece(0),
+            next_piece: Position::gen_piece(current_piece),
             lines: 0,
             score: 0,
             board: vec![vec![0; BOARD_WIDTH]; BOARD_HEIGHT],
