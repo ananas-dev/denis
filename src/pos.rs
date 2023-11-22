@@ -1,6 +1,10 @@
 use lazy_static::lazy_static;
+use rustc_hash::FxHashSet;
 use rand::Rng;
-use std::{fmt, hash::Hasher};
+use std::{
+    fmt,
+    hash::Hasher,
+};
 
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 22;
@@ -166,8 +170,14 @@ impl Position {
         x: i32,
         y: i32,
         rot: i32,
-        delta_x: i32,
+        cache: &mut FxHashSet<(i32, i32, i32)>,
     ) -> bool {
+        if cache.contains(&(x, y, rot)) {
+            return false;
+        }
+
+        cache.insert((x, y, rot));
+
         let piece = &PIECES[piece_idx][rot as usize];
         let size_x = piece[0].len() as i32;
         let size_y = piece.len() as i32;
@@ -185,20 +195,21 @@ impl Position {
             return true;
         }
 
-        if delta_x != -1 && self.pathfind_open_air(open_air_mask, piece_idx, x + 1, y, rot, 1) {
+        if self.pathfind_open_air(open_air_mask, piece_idx, x + 1, y, rot, cache) {
             return true;
         }
 
-        if delta_x != 1 && self.pathfind_open_air(open_air_mask, piece_idx, x - 1, y, rot, -1) {
+        if self.pathfind_open_air(open_air_mask, piece_idx, x - 1, y, rot, cache) {
             return true;
         }
 
-        if self.pathfind_open_air(open_air_mask, piece_idx, x, y - 1, rot, 0) {
+        if self.pathfind_open_air(open_air_mask, piece_idx, x, y - 1, rot, cache) {
             return true;
         }
 
         let rot_num = *&ROTATION_OFFSETS[piece_idx].len() as i32;
-        let rot_offset = ROTATION_OFFSETS[piece_idx][(((rot - 1) % rot_num + rot_num) % rot_num) as usize];
+        let mut rot_offset =
+            ROTATION_OFFSETS[piece_idx][(((rot - 1) % rot_num + rot_num) % rot_num) as usize];
 
         if self.pathfind_open_air(
             open_air_mask,
@@ -206,7 +217,20 @@ impl Position {
             x - rot_offset.0,
             y - rot_offset.1,
             ((rot - 1) % rot_num + rot_num) % rot_num,
-            0,
+            cache,
+        ) {
+            return true;
+        }
+
+        rot_offset = ROTATION_OFFSETS[piece_idx][rot as usize];
+
+        if self.pathfind_open_air(
+            open_air_mask,
+            piece_idx,
+            x + rot_offset.0,
+            y + rot_offset.1,
+            (rot + 1) % rot_num,
+            cache,
         ) {
             return true;
         }
@@ -217,6 +241,7 @@ impl Position {
     pub fn gen_legal_moves(&self) -> Vec<(usize, usize, usize)> {
         let mut legal_moves = Vec::new();
         let mut open_air_mask = vec![vec![1; BOARD_WIDTH]; BOARD_HEIGHT];
+        let mut cache = FxHashSet::default();
 
         for x in 0..BOARD_WIDTH {
             let mut y = 0;
@@ -245,9 +270,8 @@ impl Position {
                                 x as i32,
                                 y as i32,
                                 rot as i32,
-                                0,
+                                &mut cache,
                             ) {
-                                
                                 legal_moves.push((x, y, rot));
                             }
                         } else {
@@ -326,7 +350,9 @@ impl Position {
         // Place the piece
         for i in 0..size_x {
             for j in 0..size_y {
-                new_board[y + j][x + i] = piece[j][i]
+                if new_board[y + j][x + i] == 0 && piece[j][i] != 0 {
+                    new_board[y + j][x + i] = piece[j][i]
+                }
             }
         }
 
@@ -364,18 +390,18 @@ impl Position {
         ));
     }
 
-    fn get_hash(&self) -> u64 {
-        let mut hash = 0;
+    // fn get_hash(&self) -> u64 {
+    //     let mut hash = 0;
 
-        for x in 0..BOARD_WIDTH {
-            for y in 0..BOARD_HEIGHT {
-                let piece = self.board[y][x] as usize;
-                // hash ^= ZOBRIST[(y * BOARD_HEIGHT + x) * (22 * BOARD_WIDTH) + piece];
-            }
-        }
+    //     for x in 0..BOARD_WIDTH {
+    //         for y in 0..BOARD_HEIGHT {
+    //             let piece = self.board[y][x] as usize;
+    //             // hash ^= ZOBRIST[(y * BOARD_HEIGHT + x) * (22 * BOARD_WIDTH) + piece];
+    //         }
+    //     }
 
-        hash
-    }
+    //     hash
+    // }
 }
 
 impl fmt::Display for Position {
@@ -537,5 +563,35 @@ mod tests {
         ];
 
         assert_eq!(moves, expected)
+    }
+
+    #[test]
+    fn stack_overflow() {
+        let board = vec![
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 5, 0, 1, 1, 1, 1, 0],
+            vec![0, 0, 0, 5, 5, 1, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 5, 1, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 4, 1, 0, 0, 0, 0],
+            vec![2, 2, 0, 0, 4, 1, 7, 0, 7, 0],
+            vec![2, 2, 0, 0, 4, 4, 7, 7, 7, 7],
+        ];
+
+        Position::new(6, 1, 0, 0, board).gen_legal_moves();
     }
 }

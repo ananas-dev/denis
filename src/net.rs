@@ -1,15 +1,16 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
+
 
 pub struct FeedForwardNetwork {
     input_nodes: Vec<i64>,
     output_nodes: Vec<i64>,
     node_evals: Vec<(i64, f64, f64, Vec<(i64, f64)>)>,
-    values: HashMap<i64, f64>,
+    values: FxHashMap<i64, f64>,
 }
 
 impl FeedForwardNetwork {
     pub fn new(inputs: Vec<i64>, outputs: Vec<i64>, node_evals: Vec<(i64, f64, f64, Vec<(i64, f64)>)>) -> Self {
-        let mut values = HashMap::new();
+        let mut values = FxHashMap::default();
         for key in inputs.iter().chain(outputs.iter()) {
             values.insert(*key, 0.0 as f64);
         }

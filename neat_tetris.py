@@ -118,7 +118,7 @@ if __name__ == "__main__":
     modify_config_file()
     # Tests on a game
     if not train: 
-        net = load_genome("nes-strong.pkl")
+        net = load_genome("nes2.pkl")
         # Tests the best genome on a test game
         play_engine = engine.Engine("./target/release/neat-tetris")
 
@@ -130,7 +130,6 @@ if __name__ == "__main__":
         play_engine.load(net.input_nodes, net.output_nodes, cleaned_node_evals)
 
         pos = play_engine.peek()
-        print(pos)
         board = np.array(pos["board"])
 
         graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board,10)
