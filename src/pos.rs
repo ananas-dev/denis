@@ -5,9 +5,12 @@ use std::{fmt, hash::Hasher};
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 22;
 
+type Board = Vec<Vec<usize>>;
+type Piece = Vec<Vec<usize>>;
+
 lazy_static! {
     #[rustfmt::skip]
-    static ref PIECES: Vec<Vec<Vec<Vec<usize>>>> = vec![
+    static ref PIECES: Vec<Vec<Piece>> = vec![
         vec![
             vec![
                 vec![1, 1, 1, 1]
@@ -108,6 +111,18 @@ lazy_static! {
             ],
         ],
     ];
+
+    static ref ROTATION_OFFSETS: Vec<Vec<(i32, i32)>> = vec![
+        vec![(2, -2), (-2, 2)],
+        vec![(0, 0)],
+        vec![(0, -1), (0, 0), (1, 0), (-1, 1)],
+        vec![(0, -1), (0, 0), (1, 0), (-1, 1)],
+        vec![(1, -1), (-1, 1)],
+        vec![(0, -1), (0, 0), (1, 0), (-1, 1)],
+        vec![(1, -1), (-1, 1)],
+    ];
+
+
 }
 
 #[derive(Debug)]
@@ -124,7 +139,7 @@ pub struct Position {
     pub current_piece: usize,
     pub next_piece: usize,
     pub lines: usize,
-    pub board: Vec<Vec<usize>>,
+    pub board: Board,
 }
 
 impl Position {
@@ -133,7 +148,7 @@ impl Position {
         next_piece: usize,
         lines: usize,
         score: i64,
-        board: Vec<Vec<usize>>,
+        board: Board,
     ) -> Self {
         Position {
             current_piece,
@@ -144,15 +159,102 @@ impl Position {
         }
     }
 
-    pub fn gen_legal_moves(&self) -> Vec<(usize, usize)> {
+    fn pathfind_open_air(
+        &self,
+        open_air_mask: &Board,
+        piece_idx: usize,
+        x: i32,
+        y: i32,
+        rot: i32,
+        delta_x: i32,
+    ) -> bool {
+        let piece = &PIECES[piece_idx][rot as usize];
+        let size_x = piece[0].len() as i32;
+        let size_y = piece.len() as i32;
+
+        if x < 0
+            || x > BOARD_WIDTH as i32 - size_x
+            || y < 0
+            || y > BOARD_HEIGHT as i32 - size_y
+            || check_colision(&self.board, piece, x as usize, y as usize)
+        {
+            return false;
+        }
+
+        if !check_colision(open_air_mask, piece, x as usize, y as usize) {
+            return true;
+        }
+
+        if delta_x != -1 && self.pathfind_open_air(open_air_mask, piece_idx, x + 1, y, rot, 1) {
+            return true;
+        }
+
+        if delta_x != 1 && self.pathfind_open_air(open_air_mask, piece_idx, x - 1, y, rot, -1) {
+            return true;
+        }
+
+        if self.pathfind_open_air(open_air_mask, piece_idx, x, y - 1, rot, 0) {
+            return true;
+        }
+
+        let rot_num = *&ROTATION_OFFSETS[piece_idx].len() as i32;
+        let rot_offset = ROTATION_OFFSETS[piece_idx][(((rot - 1) % rot_num + rot_num) % rot_num) as usize];
+
+        if self.pathfind_open_air(
+            open_air_mask,
+            piece_idx,
+            x - rot_offset.0,
+            y - rot_offset.1,
+            ((rot - 1) % rot_num + rot_num) % rot_num,
+            0,
+        ) {
+            return true;
+        }
+
+        false
+    }
+
+    pub fn gen_legal_moves(&self) -> Vec<(usize, usize, usize)> {
         let mut legal_moves = Vec::new();
+        let mut open_air_mask = vec![vec![1; BOARD_WIDTH]; BOARD_HEIGHT];
 
-        let piece_type = &PIECES[self.current_piece - 1];
+        for x in 0..BOARD_WIDTH {
+            let mut y = 0;
 
-        for (rotation, piece) in piece_type.iter().enumerate() {
+            while y < BOARD_HEIGHT && self.board[y][x] == 0 {
+                open_air_mask[y][x] = 0;
+                y += 1;
+            }
+        }
+
+        let piece_kind = &PIECES[self.current_piece - 1];
+
+        for (rot, piece) in piece_kind.iter().enumerate() {
             let size_x = piece[0].len();
-            for x in 0..(BOARD_WIDTH + 1 - size_x) {
-                legal_moves.push((x, rotation));
+            let size_y = piece.len();
+            for x in 0..(BOARD_WIDTH - size_x + 1) {
+                for y in 0..(BOARD_HEIGHT - size_y + 1) {
+                    if !check_colision(&self.board, piece, x, y)
+                        && (y == BOARD_HEIGHT - size_y
+                            || check_colision(&self.board, piece, x, y + 1))
+                    {
+                        if check_colision(&open_air_mask, piece, x, y) {
+                            if self.pathfind_open_air(
+                                &open_air_mask,
+                                self.current_piece - 1,
+                                x as i32,
+                                y as i32,
+                                rot as i32,
+                                0,
+                            ) {
+                                
+                                legal_moves.push((x, y, rot));
+                            }
+                        } else {
+                            legal_moves.push((x, y, rot));
+                        }
+                    }
+                }
             }
         }
 
@@ -213,73 +315,53 @@ impl Position {
         next_piece
     }
 
-    pub fn apply_move(&self, x: usize, rotation: usize) -> Option<Position> {
-        let piece = &PIECES[self.current_piece - 1][rotation];
+    pub fn apply_move(&self, x: usize, y: usize, rot: usize) -> Option<Position> {
+        let piece = &PIECES[self.current_piece - 1][rot];
         let size_x = piece[0].len();
         let size_y = piece.len();
 
-        for y in 0..((BOARD_HEIGHT + 1) - size_y) {
-            for i in 0..size_x {
-                for j in 0..size_y {
-                    if y == BOARD_HEIGHT - size_y
-                        || (x + i < BOARD_WIDTH
-                            && piece[j][i] != 0
-                            && self.board[j + y + 1][i + x] != 0)
-                    {
-                        let mut new_board = self.board.clone();
-                        let mut new_score = self.score;
+        let mut new_board = self.board.clone();
+        let mut new_score = self.score;
 
-                        // Place the piece
-                        for i in 0..size_x {
-                            for j in 0..size_y {
-                                if new_board[y + j][x + i] == 0 && piece[j][i] != 0 {
-                                    new_board[y + j][x + i] = piece[j][i]
-                                }
-                            }
-                        }
-
-                        // Update lines
-                        let mut line_count = 0;
-                        for j in 0..BOARD_HEIGHT {
-                            let full_line = new_board[j].iter().all(|&cell| cell != 0);
-
-                            if full_line {
-                                line_count += 1;
-                                new_board.remove(j);
-                                new_board.insert(0, vec![0; BOARD_WIDTH]);
-                            }
-                        }
-
-                        new_score += match line_count {
-                            1 => 40,
-                            2 => 100,
-                            3 => 300,
-                            4 => 1200,
-                            _ => 0,
-                        };
-
-                        // Check game over
-                        for i in 0..BOARD_WIDTH {
-                            if new_board[0][i] != 0 || new_board[1][i] != 0 {
-                                return None;
-                            }
-                        }
-
-                        let mut next_piece = rand::thread_rng().gen_range(1..8);
-
-                        return Some(Position::new(
-                            self.next_piece,
-                            Position::gen_piece(self.next_piece),
-                            self.lines + line_count,
-                            new_score,
-                            new_board,
-                        ));
-                    }
-                }
+        // Place the piece
+        for i in 0..size_x {
+            for j in 0..size_y {
+                new_board[y + j][x + i] = piece[j][i]
             }
         }
 
-        None
+        // Update lines
+        let mut line_count = 0;
+        for j in 0..BOARD_HEIGHT {
+            let full_line = new_board[j].iter().all(|&cell| cell != 0);
+
+            if full_line {
+                line_count += 1;
+                new_board.remove(j);
+                new_board.insert(0, vec![0; BOARD_WIDTH]);
+            }
+        }
+
+        // Experiment to only reward tetris
+        new_score += match line_count {
+            4 => 1,
+            _ => 0,
+        };
+
+        // Check game over
+        for i in 0..BOARD_WIDTH {
+            if new_board[0][i] != 0 || new_board[1][i] != 0 {
+                return None;
+            }
+        }
+
+        return Some(Position::new(
+            self.next_piece,
+            Position::gen_piece(self.next_piece),
+            self.lines + line_count,
+            new_score,
+            new_board,
+        ));
     }
 
     fn get_hash(&self) -> u64 {
@@ -332,12 +414,27 @@ impl Hasher for Position {
     }
 }
 
+fn check_colision(board: &Board, piece: &Piece, x: usize, y: usize) -> bool {
+    let size_x = piece[0].len();
+    let size_y = piece.len();
+
+    for i in 0..size_x {
+        for j in 0..size_y {
+            if board[y + j][x + i] != 0 && piece[j][i] != 0 {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn features() {
+    fn test_features() {
         let board = vec![
             vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -368,5 +465,77 @@ mod tests {
         assert_eq!(feat.bumpiness, 6.);
         assert_eq!(feat.aggregate_height, 48.);
         assert_eq!(feat.holes, 2.);
+    }
+
+    #[test]
+    fn test_gen_moves() {
+        let board = vec![
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![1, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+            vec![1, 0, 0, 0, 1, 1, 1, 1, 1, 1],
+            vec![1, 1, 0, 1, 1, 1, 1, 1, 1, 1],
+        ];
+
+        let moves = Position::new(6, 1, 0, 0, board).gen_legal_moves();
+
+        let expected = vec![
+            (0, 18, 0),
+            (1, 18, 0),
+            (1, 20, 0),
+            (2, 17, 0),
+            (3, 18, 0),
+            (4, 18, 0),
+            (5, 18, 0),
+            (6, 18, 0),
+            (7, 18, 0),
+            (0, 17, 1),
+            (1, 19, 1),
+            (2, 16, 1),
+            (3, 17, 1),
+            (4, 17, 1),
+            (5, 17, 1),
+            (6, 17, 1),
+            (7, 17, 1),
+            (8, 17, 1),
+            (0, 17, 2),
+            (1, 17, 2),
+            (1, 19, 2),
+            (2, 17, 2),
+            (3, 17, 2),
+            (4, 18, 2),
+            (5, 18, 2),
+            (6, 18, 2),
+            (7, 18, 2),
+            (0, 16, 3),
+            (1, 18, 3),
+            (2, 17, 3),
+            (2, 19, 3),
+            (3, 16, 3),
+            (4, 17, 3),
+            (5, 17, 3),
+            (6, 17, 3),
+            (7, 17, 3),
+            (8, 17, 3),
+        ];
+
+        assert_eq!(moves, expected)
     }
 }

@@ -89,7 +89,7 @@ pub fn start() -> io::Result<()> {
                 if let Some(nn) = &mut net {
                     let best = search::find_best_move(nn, &pos);
                     pos.lines = 0;
-                    pos = pos.apply_move(best.0, best.1).unwrap();
+                    pos = pos.apply_move(best.0, best.1, best.2).unwrap();
                 }
             }
             In::Peek => {
@@ -108,7 +108,7 @@ pub fn start() -> io::Result<()> {
                 if let Some(nn) = &mut net {
                     pos.lines = 0;
                     let mut best = search::find_best_move(nn, &pos);
-                    while let Some(new_pos) = pos.apply_move(best.0, best.1) {
+                    while let Some(new_pos) = pos.apply_move(best.0, best.1, best.2) {
                         if total_moves <= 500 {
                             pos = new_pos;
                             pos.lines = 0;
