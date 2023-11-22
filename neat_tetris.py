@@ -118,7 +118,7 @@ if __name__ == "__main__":
     modify_config_file()
     # Tests on a game
     if not train: 
-        net = load_genome("./models/strong.pkl")
+        net = load_genome("nes-strong.pkl")
         # Tests the best genome on a test game
         play_engine = engine.Engine("./target/release/neat-tetris")
 
