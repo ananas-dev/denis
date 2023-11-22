@@ -7,7 +7,7 @@ import engine
 
 
 ### TRAINING PARAMETERS ###
-train = False
+train = True
 
 
 ##########################
@@ -15,9 +15,9 @@ train = False
 
 pop_size = 16
 fitness_threshold = 1000
-num_inputs = 4
+num_inputs = 22 * 10
 num_outputs = 1 # Score based on the 7 inputs
-num_generations = 10000
+num_generations = 1000000
 
 ##########################
 ##########################
@@ -107,7 +107,7 @@ def run(config_file, retrain=False):
     
     p.add_reporter(neat.StdOutReporter(True))
     p.add_reporter(neat.StatisticsReporter())
-    p.add_reporter(neat.Checkpointer(10, None)) # Saves the model every two generations
+    p.add_reporter(neat.Checkpointer(500, None)) # Saves the model every two generations
 
     evaluator = neat.ParallelEvaluator(16, eval_genome)
 
