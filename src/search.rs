@@ -23,21 +23,21 @@ pub fn find_best_move(net: &mut FeedForwardNetwork, pos: &Position) -> (usize, u
 fn search(net: &mut FeedForwardNetwork, pos: Position, depth: usize) -> f64 {
     if depth == 0 {
         // Flatten the board and pass it to the neural net
-        // return net.activate(
-        //     pos.board
-        //         .into_iter()
-        //         .flat_map(|inner| inner)
-        //         .map(|c| c as f64)
-        //         .collect(),
-        // )[0];
-        let features = pos.features();
+        return net.activate(
+            pos.board
+                .into_iter()
+                .flat_map(|inner| inner)
+                .map(|c| if c != 0 { 1. } else { 0. })
+                .collect(),
+        )[0];
+        // let features = pos.features();
 
-        return net.activate(vec![
-            features.completed_lines,
-            features.holes,
-            features.bumpiness,
-            features.aggregate_height,
-        ])[0];
+        // return net.activate(vec![
+        //     features.completed_lines,
+        //     features.holes,
+        //     features.bumpiness,
+        //     features.aggregate_height,
+        // ])[0];
     }
 
     let mut maxscore = -f64::INFINITY;

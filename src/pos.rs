@@ -1,10 +1,7 @@
 use lazy_static::lazy_static;
-use rustc_hash::FxHashSet;
 use rand::Rng;
-use std::{
-    fmt,
-    hash::Hasher,
-};
+use rustc_hash::FxHashSet;
+use std::{fmt, hash::Hasher};
 
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 22;
@@ -368,9 +365,11 @@ impl Position {
             }
         }
 
-        // Experiment to only reward tetris
         new_score += match line_count {
-            4 => 1,
+            1 => 40,
+            2 => 100,
+            3 => 300,
+            4 => 1200,
             _ => 0,
         };
 
