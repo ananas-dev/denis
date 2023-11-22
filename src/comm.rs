@@ -1,4 +1,4 @@
-use std::{io, collections::VecDeque};
+use std::{collections::VecDeque, io};
 
 use serde::{Deserialize, Serialize};
 
@@ -105,27 +105,27 @@ pub fn start() -> io::Result<()> {
                 )
             }
             In::PlayGame => {
-                if total_moves <= 500 {
-                    if let Some(nn) = &mut net {
-                        pos.lines = 0;
-                        let mut best = search::find_best_move(nn, &pos);
-                        while let Some(new_pos) = pos.apply_move(best.0, best.1) {
+                if let Some(nn) = &mut net {
+                    pos.lines = 0;
+                    let mut best = search::find_best_move(nn, &pos);
+                    while let Some(new_pos) = pos.apply_move(best.0, best.1) {
+                        if total_moves <= 500 {
                             pos = new_pos;
                             pos.lines = 0;
                             best = search::find_best_move(nn, &pos);
+                            total_moves += 1;
+                        } else {
+                            break;
                         }
-
-                        send(&Out::GameResult { score: pos.score })?;
-                        pos = Position::default();
-                        total_moves += 1;
                     }
+
+                    send(&Out::GameResult { score: pos.score })?;
+                    pos = Position::default();
                 };
-            },
-            In::Ready => {
-                match net {
-                    Some(_) => send(&Out::Ok)?,
-                    None => send(&Out::Ko)?,
-                }
+            }
+            In::Ready => match net {
+                Some(_) => send(&Out::Ok)?,
+                None => send(&Out::Ko)?,
             },
         }
     }
