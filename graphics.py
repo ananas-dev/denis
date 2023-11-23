@@ -189,12 +189,6 @@ class Graphic():
                 fn_line(surface, color, (col,y1), (col,y2))
 
 
-    def draw_bg(self):
-        self.fill_gradient(self.display, self.bg_color_1, self.bg_color_2)
-        self.draw_grid()
-        self.show_score()
-        self.draw_side_panel_pieces()
-
     def draw_grid(self):
         for row in range(2, self.num_rows+1):
             pg.draw.line(self.display, self.grid_color, (0, row * self.block_height), (self.width, row * self.block_height), 2)
@@ -259,13 +253,19 @@ class Graphic():
             y_offset += dy
             y_offset += 1
             rot += dr
-            self.draw_bg()
+            self.fill_gradient(self.display, self.bg_color_1, self.bg_color_2, vertical=False, forward=True)
             self.draw_piece(self.current_piece, (y_offset, x_offset), rotation=rot)
+            self.draw_grid()
+            self.show_score()
+            self.draw_side_panel_pieces()
             pg.display.update()
             self.tick()
 
     def draw(self):
-        self.draw_bg()
+        self.fill_gradient(self.display, self.bg_color_1, self.bg_color_2, vertical=False, forward=True)
+        self.draw_grid()
+        self.show_score()
+        self.draw_side_panel_pieces()
         self.animate_piece()
         self.draw_board()
         pg.display.update()
@@ -280,11 +280,11 @@ class Graphic():
 
 if __name__ == "__main__":
     board = np.zeros((22, 10))
-    graphic = Graphic(200, (0, 0, 0), (0, 0,0),  (255, 255, 255), board)
+    graphic = Graphic(200, (0, 0, 0), (0, 0,0),  (255, 255, 255), board, fps=10)
     graphic.current_piece = 3
     graphic.score = 123456789000
     graphic.next_pieces = [3]
-    graphic.action_list = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1)]
+    graphic.action_list = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (1, 0, 0), (1, 0, 0), (1, 0, 0)]
     while True:
         graphic.draw()
         graphic.tick()
