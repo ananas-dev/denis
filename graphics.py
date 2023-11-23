@@ -259,7 +259,7 @@ class Graphic():
             self.show_score()
             self.draw_side_panel_pieces()
             pg.display.update()
-            self.tick()
+            self.clock.tick(60)
 
     def draw(self):
         self.fill_gradient(self.display, self.bg_color_1, self.bg_color_2, vertical=False, forward=True)
