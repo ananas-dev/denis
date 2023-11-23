@@ -1,7 +1,11 @@
 use lazy_static::lazy_static;
 use rand::Rng;
-use rustc_hash::FxHashSet;
-use std::{fmt, hash::Hasher};
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::{
+    collections::{BinaryHeap, HashSet, VecDeque},
+    fmt,
+    hash::Hasher,
+};
 
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 22;
@@ -123,6 +127,8 @@ lazy_static! {
         vec![(1, -1), (-1, 1)],
     ];
 
+    static ref SPAWNS: Vec<(i32, i32, i32)> = vec![(3, 1, 0), (4, 0, 0), (3, 0, 0), (3, 0, 0), (3, 0, 0), (3, 0, 0), (3, 0, 0)];
+
 
 }
 
@@ -132,6 +138,18 @@ pub struct Features {
     pub bumpiness: f64,
     pub aggregate_height: f64,
     pub completed_lines: f64,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+struct Action {
+    coord: (i32, i32, i32),
+    priority: i32,
+}
+
+impl Ord for Action {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.priority.cmp(&other.priority)
+    }
 }
 
 #[derive(Debug)]
@@ -160,6 +178,120 @@ impl Position {
         }
     }
 
+    pub fn path(&self, start: (i32, i32, i32)) -> Vec<(i32, i32, i32)> {
+        let goal = SPAWNS[self.current_piece - 1];
+
+        let mut frontier = BinaryHeap::new();
+        frontier.push(Action {
+            coord: start,
+            priority: 0,
+        });
+
+        let mut came_from = FxHashMap::default();
+        let mut cost_so_far = FxHashMap::default();
+        came_from.insert(start, None);
+        cost_so_far.insert(start, 0);
+
+        while !frontier.is_empty() {
+            let current = frontier.pop().unwrap().coord;
+
+            if current == goal {
+                break;
+            }
+
+            let piece = &PIECES[self.current_piece - 1][current.2 as usize];
+
+            let mut move_list = Vec::new();
+
+            if !check_colision(&self.board, piece, current.0 - 1, current.1) {
+                move_list.push((current.0 - 1, current.1, current.2))
+            }
+
+            if !check_colision(&self.board, piece, current.0 + 1, current.1) {
+                move_list.push((current.0 + 1, current.1, current.2))
+            }
+
+            if !check_colision(&self.board, piece, current.0, current.1 - 1) {
+                move_list.push((current.0, current.1 - 1, current.2))
+            }
+
+            let rot_num = *&ROTATION_OFFSETS[self.current_piece - 1].len() as i32;
+            let rot = ((current.2 - 1) % rot_num + rot_num) % rot_num;
+            let mut rot_offset = ROTATION_OFFSETS[self.current_piece - 1][rot as usize];
+
+            let piece = &PIECES[self.current_piece - 1][rot as usize];
+
+            if !check_colision(
+                &self.board,
+                piece,
+                current.0 - rot_offset.0,
+                current.1 - rot_offset.1,
+            ) {
+                move_list.push((current.0 - rot_offset.0, current.1 - rot_offset.1, rot))
+            }
+
+            rot_offset = ROTATION_OFFSETS[self.current_piece - 1][current.2 as usize];
+
+            if !check_colision(
+                &self.board,
+                piece,
+                current.0 + rot_offset.0,
+                current.1 + rot_offset.1,
+            ) {
+                move_list.push((
+                    current.0 + rot_offset.0,
+                    current.1 + rot_offset.1,
+                    (current.2 + 1) % rot_num,
+                ))
+            }
+
+            for next in move_list.iter() {
+                let new_cost = cost_so_far.get(&current).unwrap() + 1;
+                if !cost_so_far.contains_key(next) || new_cost < *cost_so_far.get(next).unwrap() {
+                    cost_so_far.insert(*next, new_cost);
+                    let priority = new_cost + dist3(*next, goal);
+                    frontier.push(Action {
+                        coord: *next,
+                        priority,
+                    });
+                    came_from.insert(*next, Some(current));
+                }
+            }
+        }
+
+        let mut current = goal;
+        let mut path = Vec::new();
+        while current != start {
+            path.push(current);
+            current = came_from.get(&current).unwrap().unwrap();
+        }
+
+        path.push(start);
+
+        // path.push((0, 0, 0));
+
+        // let mut current = goal;
+        // let mut last = current;
+
+        // while current != start {
+        //     let diff = diff3(current, last);
+
+        //     if diff == (0, 1, 0) {
+        //         path.push((0, 0, 0))
+        //     } else {
+        //         let current_action = path.last_mut().unwrap();
+        //         *current_action = add3(*current_action, diff)
+        //     }
+
+        //     last = current;
+        //     current = came_from.get(&current).unwrap().unwrap();
+        // }
+
+
+
+        path
+    }
+
     fn pathfind_open_air(
         &self,
         open_air_mask: &Board,
@@ -179,16 +311,11 @@ impl Position {
         let size_x = piece[0].len() as i32;
         let size_y = piece.len() as i32;
 
-        if x < 0
-            || x > BOARD_WIDTH as i32 - size_x
-            || y < 0
-            || y > BOARD_HEIGHT as i32 - size_y
-            || check_colision(&self.board, piece, x as usize, y as usize)
-        {
+        if check_colision(&self.board, piece, x, y) {
             return false;
         }
 
-        if !check_colision(open_air_mask, piece, x as usize, y as usize) {
+        if !check_colision(open_air_mask, piece, x, y) {
             return true;
         }
 
@@ -256,11 +383,10 @@ impl Position {
             let size_y = piece.len();
             for x in 0..(BOARD_WIDTH - size_x + 1) {
                 for y in 0..(BOARD_HEIGHT - size_y + 1) {
-                    if !check_colision(&self.board, piece, x, y)
-                        && (y == BOARD_HEIGHT - size_y
-                            || check_colision(&self.board, piece, x, y + 1))
+                    if !check_colision(&self.board, piece, x as i32, y as i32)
+                        && check_colision(&self.board, piece, x as i32, (y + 1) as i32)
                     {
-                        if check_colision(&open_air_mask, piece, x, y) {
+                        if check_colision(&open_air_mask, piece, x as i32, y as i32) {
                             if self.pathfind_open_air(
                                 &open_air_mask,
                                 self.current_piece - 1,
@@ -441,19 +567,36 @@ impl Hasher for Position {
     }
 }
 
-fn check_colision(board: &Board, piece: &Piece, x: usize, y: usize) -> bool {
-    let size_x = piece[0].len();
-    let size_y = piece.len();
+fn check_colision(board: &Board, piece: &Piece, x: i32, y: i32) -> bool {
+    let size_x = piece[0].len() as i32;
+    let size_y = piece.len() as i32;
+
+    if x < 0 || x > BOARD_WIDTH as i32 - size_x || y < 0 || y > BOARD_HEIGHT as i32 - size_y {
+        return true;
+    }
 
     for i in 0..size_x {
         for j in 0..size_y {
-            if board[y + j][x + i] != 0 && piece[j][i] != 0 {
+            if board[(y + j) as usize][(x + i) as usize] != 0 && piece[j as usize][i as usize] != 0
+            {
                 return true;
             }
         }
     }
 
     false
+}
+
+fn add3(a: (i32, i32, i32), b: (i32, i32, i32)) -> (i32, i32, i32) {
+    (a.0 + b.0, a.1 + b.1, a.2 + b.2)
+}
+
+fn diff3(a: (i32, i32, i32), b: (i32, i32, i32)) -> (i32, i32, i32) {
+    (a.0 - b.0, a.1 - b.1, a.2 - b.2)
+}
+
+fn dist3(a: (i32, i32, i32), b: (i32, i32, i32)) -> i32 {
+    (a.0 - b.0).abs() + (a.1 - b.1).abs() + (a.2 - b.2).abs()
 }
 
 #[cfg(test)]

@@ -29,8 +29,7 @@ enum In {
 #[serde(tag = "type")]
 enum Out {
     Move {
-        col: usize,
-        row: usize,
+        action_list: Vec<(i32, i32, i32)>,
     },
     Pos {
         score: i64,
@@ -87,9 +86,10 @@ pub fn start() -> io::Result<()> {
             }
             In::Go => {
                 if let Some(nn) = &mut net {
-                    let best = search::find_best_move(nn, &pos);
+                    let (best, action_list) = search::find_best_move(nn, &pos);
                     pos.lines = 0;
                     pos = pos.apply_move(best.0, best.1, best.2).unwrap();
+                    send(&Out::Move { action_list })?;
                 }
             }
             In::Peek => {
@@ -107,12 +107,12 @@ pub fn start() -> io::Result<()> {
             In::PlayGame => {
                 if let Some(nn) = &mut net {
                     pos.lines = 0;
-                    let mut best = search::find_best_move(nn, &pos);
+                    let (mut best, _) = search::find_best_move(nn, &pos);
                     while let Some(new_pos) = pos.apply_move(best.0, best.1, best.2) {
                         if total_moves <= 500 {
                             pos = new_pos;
                             pos.lines = 0;
-                            best = search::find_best_move(nn, &pos);
+                            best = search::find_best_move(nn, &pos).0;
                             total_moves += 1;
                         } else {
                             break;

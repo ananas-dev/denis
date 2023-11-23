@@ -47,6 +47,7 @@ class Engine:
     def go(self):
         msg = { "type": "Go" }
         self.send_message(msg)
+        return self.receive_message()
     
     def peek(self):
         msg = { "type": "Peek" }

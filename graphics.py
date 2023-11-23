@@ -247,20 +247,15 @@ class Graphic():
         for x, y, r in self.action_list:
             self.fill_gradient(self.display, self.bg_color_1, self.bg_color_2, vertical=False, forward=True)
             self.draw_piece(self.current_piece, (y, x), rotation=r)
+            self.draw_board()
             self.draw_grid()
             self.show_score()
             self.draw_side_panel_pieces()
             pg.display.update()
-            self.clock.tick(60)
+            self.clock.tick(self.fps)
 
     def draw(self):
-        self.fill_gradient(self.display, self.bg_color_1, self.bg_color_2, vertical=False, forward=True)
-        self.draw_grid()
-        self.show_score()
-        self.draw_side_panel_pieces()
         self.animate_piece()
-        self.draw_board()
-        pg.display.update()
 
     def tick(self):
         self.clock.tick(self.fps)

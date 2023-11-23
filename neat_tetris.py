@@ -7,7 +7,7 @@ import engine
 
 
 ### TRAINING PARAMETERS ###
-train = True
+train = False
 
 
 ##########################
@@ -15,7 +15,7 @@ train = True
 
 pop_size = 16
 fitness_threshold = 1000
-num_inputs = 22 * 10
+num_inputs = 4
 num_outputs = 1 # Score based on the 7 inputs
 num_generations = 1000000
 
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     modify_config_file()
     # Tests on a game
     if not train: 
-        net = load_genome("nes2.pkl")
+        net = load_genome("nes-strong-2.pkl")
         # Tests the best genome on a test game
         play_engine = engine.Engine("./target/release/neat-tetris")
 
@@ -130,20 +130,27 @@ if __name__ == "__main__":
         play_engine.load(net.input_nodes, net.output_nodes, cleaned_node_evals)
 
         pos = play_engine.peek()
+
         board = np.array(pos["board"])
 
-        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board,10)
+        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board, 30)
         while True:
-            play_engine.go()
-            pos = play_engine.peek()
+            move = play_engine.go()
 
-            graphic.board = np.array(pos["board"]).reshape(22, 10)
+            action_list = move["action_list"]
+
+            graphic.action_list = action_list
+
+
+            graphic.board = np.array(pos["board"])
             graphic.current_piece = pos["current_piece"]
             graphic.next_pieces = [pos["next_piece"]]
             graphic.score = pos["score"]
 
             graphic.tick()
             graphic.draw()
+
+            pos = play_engine.peek()
 
         print("Game over !")
         print("Score :", t.score)

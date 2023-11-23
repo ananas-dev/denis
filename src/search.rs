@@ -1,8 +1,6 @@
-use serde::de::IntoDeserializer;
-
 use crate::{net::FeedForwardNetwork, pos::Position};
 
-pub fn find_best_move(net: &mut FeedForwardNetwork, pos: &Position) -> (usize, usize, usize) {
+pub fn find_best_move(net: &mut FeedForwardNetwork, pos: &Position) -> ((usize, usize, usize), Vec<(i32, i32, i32)>) {
     let mut maxscore = -f64::INFINITY;
     let mut best_move = (0, 0, 0);
 
@@ -17,27 +15,29 @@ pub fn find_best_move(net: &mut FeedForwardNetwork, pos: &Position) -> (usize, u
         }
     }
 
-    best_move
+    let test = (best_move.0 as i32, best_move.1 as i32, best_move.2 as i32);
+
+    (best_move, pos.path(test))
 }
 
 fn search(net: &mut FeedForwardNetwork, pos: Position, depth: usize) -> f64 {
     if depth == 0 {
         // Flatten the board and pass it to the neural net
-        return net.activate(
-            pos.board
-                .into_iter()
-                .flat_map(|inner| inner)
-                .map(|c| if c != 0 { 1. } else { 0. })
-                .collect(),
-        )[0];
-        // let features = pos.features();
+        // return net.activate(
+        //     pos.board
+        //         .into_iter()
+        //         .flat_map(|inner| inner)
+        //         .map(|c| if c != 0 { 1. } else { 0. })
+        //         .collect(),
+        // )[0];
+        let features = pos.features();
 
-        // return net.activate(vec![
-        //     features.completed_lines,
-        //     features.holes,
-        //     features.bumpiness,
-        //     features.aggregate_height,
-        // ])[0];
+        return net.activate(vec![
+            features.completed_lines,
+            features.holes,
+            features.bumpiness,
+            features.aggregate_height,
+        ])[0];
     }
 
     let mut maxscore = -f64::INFINITY;
