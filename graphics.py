@@ -244,17 +244,9 @@ class Graphic():
         Args:
             action_list (list): list of actions to perform
         """
-        x_offset, y_offset = SPAWNS[self.current_piece-1]
-        rot = 0
-        self.draw_piece(self.current_piece, (x_offset, y_offset), rotation=rot)
-        pg.display.update()
-        for dx, dy, dr in self.action_list:
-            x_offset += dx
-            y_offset += dy
-            y_offset += 1
-            rot += dr
+        for x, y, r in self.action_list:
             self.fill_gradient(self.display, self.bg_color_1, self.bg_color_2, vertical=False, forward=True)
-            self.draw_piece(self.current_piece, (y_offset, x_offset), rotation=rot)
+            self.draw_piece(self.current_piece, (y, x), rotation=r)
             self.draw_grid()
             self.show_score()
             self.draw_side_panel_pieces()
