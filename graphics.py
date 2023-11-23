@@ -271,7 +271,7 @@ if __name__ == "__main__":
     graphic.current_piece = 3
     graphic.score = 123456789000
     graphic.next_pieces = [3]
-    graphic.action_list = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (1, 0, 0), (1, 0, 0), (1, 0, 0)]
+    graphic.action_list = [(0, 0, 0), (0, 1, 0), (0, 2, 0), (0, 3, 1), (0, 4, 1), (0, 5, 1), (0, 6, 1), (0, 7, 1), (0, 8, 1), (0, 9, 1)]
     while True:
         graphic.draw()
         graphic.tick()
