@@ -14,8 +14,12 @@ class Engine:
         self.process.stdin.flush()
 
     def receive_message(self):
-        raw_message = self.process.stdout.readline()
-        return json.loads(raw_message)
+        while True:
+            raw_message = self.process.stdout.readline()
+            try:
+                return json.loads(raw_message)
+            except:
+                print(raw_message)
 
     def load(self, input_nodes, output_nodes, node_evals):
         msg = {

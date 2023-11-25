@@ -2,7 +2,7 @@ use lazy_static::lazy_static;
 use rand::Rng;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Serialize;
-use std::{cmp, collections::BinaryHeap, fmt};
+use std::{cmp::{self, Ordering}, collections::BinaryHeap, fmt};
 
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 22;
@@ -137,7 +137,7 @@ pub struct Features {
     pub completed_lines: f64,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash, Serialize)]
 pub enum Action {
     MoveLeft,
     MoveRight,
@@ -147,7 +147,7 @@ pub enum Action {
     None,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
 struct Move {
     action: Action,
     dest: (i32, i32, i32),
@@ -159,7 +159,7 @@ impl Move {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct OrderedMove {
     mv: Move,
     priority: i32,
@@ -172,8 +172,14 @@ impl OrderedMove {
 }
 
 impl Ord for OrderedMove {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         other.priority.cmp(&self.priority)
+    }
+}
+
+impl PartialOrd for OrderedMove {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -223,12 +229,12 @@ impl Position {
             let current = frontier.pop().unwrap().mv;
             let dest = current.dest;
 
-            if current.dest == goal {
+            if dest == goal {
                 goal_mv = Some(current);
                 break;
             }
 
-            let piece = &PIECES[self.current_piece - 1][rotation_index(current.dest.2, rot_num)];
+            let mut piece = &PIECES[self.current_piece - 1][wrap_rot(current.dest.2, rot_num) as usize];
 
             let mut move_list = Vec::new();
 
@@ -247,7 +253,7 @@ impl Position {
             let mut rot = wrap_rot(dest.2 - 1, rot_num) as usize;
             let mut rot_offset = ROTATION_OFFSETS[self.current_piece - 1][rot];
 
-            let mut piece = &PIECES[self.current_piece - 1][rot];
+            piece = &PIECES[self.current_piece - 1][rot];
 
             if !check_colision(
                 &self.board,
@@ -287,17 +293,17 @@ impl Position {
 
             for &next in move_list.iter() {
                 // Lower costs to higher actions
-                // let c = match next.action {
-                //     Action::SoftDrop => 1,
-                //     _ => next.dest.1 + 1
-                // };
+                let c = match next.action {
+                    Action::SoftDrop => 1,
+                    _ => next.dest.1 + 1,
+                };
 
-                let new_cost = cost_so_far.get(&current.dest).unwrap() + 1;
+                let new_cost = cost_so_far.get(&current.dest).unwrap() + c;
                 if !cost_so_far.contains_key(&next.dest)
                     || new_cost < *cost_so_far.get(&next.dest).unwrap()
                 {
                     cost_so_far.insert(next.dest, new_cost);
-                    let priority = new_cost + proximity(next.dest, goal, rot_num);
+                    let priority = new_cost + proximity(goal, next.dest, rot_num);
                     frontier.push(OrderedMove::new(next, priority));
                     came_from.insert(next.dest, Some(current));
                 }
@@ -607,12 +613,9 @@ fn wrap_rot(rot: i32, dim: i32) -> i32 {
     (rot % dim + dim) % dim
 }
 
-fn rotation_index(rotation: i32, dim: i32) -> usize {
-    ((rotation % dim + dim) % dim) as usize
-}
-
 fn proximity(a: (i32, i32, i32), b: (i32, i32, i32), rot_dim: i32) -> i32 {
-    (a.0 - b.0).abs() + cmp::min(wrap_rot(a.2 - b.2, rot_dim), wrap_rot(b.2 - a.2, rot_dim))
+    (a.0 - b.0).abs()
+    + cmp::min(wrap_rot(a.2 - b.2, rot_dim), wrap_rot(b.2 - a.2, rot_dim))
 }
 
 #[cfg(test)]
