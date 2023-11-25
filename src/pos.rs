@@ -1,11 +1,8 @@
 use lazy_static::lazy_static;
 use rand::Rng;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{
-    collections::{BinaryHeap, HashSet, VecDeque},
-    fmt,
-    hash::Hasher,
-};
+use serde::Serialize;
+use std::{cmp, collections::BinaryHeap, fmt};
 
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 22;
@@ -140,15 +137,43 @@ pub struct Features {
     pub completed_lines: f64,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Hash, Serialize)]
+pub enum Action {
+    MoveLeft,
+    MoveRight,
+    SoftDrop,
+    RotateCounterclockwise,
+    RotateClockwise,
+    None,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
-struct Action {
-    coord: (i32, i32, i32),
+struct Move {
+    action: Action,
+    dest: (i32, i32, i32),
+}
+
+impl Move {
+    fn new(action: Action, dest: (i32, i32, i32)) -> Move {
+        Move { action, dest }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+struct OrderedMove {
+    mv: Move,
     priority: i32,
 }
 
-impl Ord for Action {
+impl OrderedMove {
+    fn new(mv: Move, priority: i32) -> OrderedMove {
+        OrderedMove { mv, priority }
+    }
+}
+
+impl Ord for OrderedMove {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.priority.cmp(&other.priority)
+        other.priority.cmp(&self.priority)
     }
 }
 
@@ -178,14 +203,16 @@ impl Position {
         }
     }
 
-    pub fn path(&self, start: (i32, i32, i32)) -> Vec<(i32, i32, i32)> {
-        let goal = SPAWNS[self.current_piece - 1];
+    pub fn path(&self, goal: (i32, i32, i32)) -> Vec<Action> {
+        let rot_num = ROTATION_OFFSETS[self.current_piece - 1].len() as i32;
+
+        let mut goal_mv = None;
+
+        let start = SPAWNS[self.current_piece - 1];
+        let start_move = OrderedMove::new(Move::new(Action::None, start), 0);
 
         let mut frontier = BinaryHeap::new();
-        frontier.push(Action {
-            coord: start,
-            priority: 0,
-        });
+        frontier.push(start_move);
 
         let mut came_from = FxHashMap::default();
         let mut cost_so_far = FxHashMap::default();
@@ -193,101 +220,102 @@ impl Position {
         cost_so_far.insert(start, 0);
 
         while !frontier.is_empty() {
-            let current = frontier.pop().unwrap().coord;
+            let current = frontier.pop().unwrap().mv;
+            let dest = current.dest;
 
-            if current == goal {
+            if current.dest == goal {
+                goal_mv = Some(current);
                 break;
             }
 
-            let piece = &PIECES[self.current_piece - 1][current.2 as usize];
+            let piece = &PIECES[self.current_piece - 1][rotation_index(current.dest.2, rot_num)];
 
             let mut move_list = Vec::new();
 
-            if !check_colision(&self.board, piece, current.0 - 1, current.1) {
-                move_list.push((current.0 - 1, current.1, current.2))
+            if !check_colision(&self.board, piece, dest.0 - 1, dest.1) {
+                move_list.push(Move::new(Action::MoveLeft, (dest.0 - 1, dest.1, dest.2)));
             }
 
-            if !check_colision(&self.board, piece, current.0 + 1, current.1) {
-                move_list.push((current.0 + 1, current.1, current.2))
+            if !check_colision(&self.board, piece, dest.0 + 1, dest.1) {
+                move_list.push(Move::new(Action::MoveRight, (dest.0 + 1, dest.1, dest.2)));
             }
 
-            if !check_colision(&self.board, piece, current.0, current.1 - 1) {
-                move_list.push((current.0, current.1 - 1, current.2))
+            if !check_colision(&self.board, piece, dest.0, dest.1 + 1) {
+                move_list.push(Move::new(Action::SoftDrop, (dest.0, dest.1 + 1, dest.2)));
             }
 
-            let rot_num = *&ROTATION_OFFSETS[self.current_piece - 1].len() as i32;
-            let rot = ((current.2 - 1) % rot_num + rot_num) % rot_num;
-            let mut rot_offset = ROTATION_OFFSETS[self.current_piece - 1][rot as usize];
+            let mut rot = wrap_rot(dest.2 - 1, rot_num) as usize;
+            let mut rot_offset = ROTATION_OFFSETS[self.current_piece - 1][rot];
 
-            let piece = &PIECES[self.current_piece - 1][rot as usize];
+            let mut piece = &PIECES[self.current_piece - 1][rot];
 
             if !check_colision(
                 &self.board,
                 piece,
-                current.0 - rot_offset.0,
-                current.1 - rot_offset.1,
+                dest.0 - rot_offset.0,
+                dest.1 - rot_offset.1,
             ) {
-                move_list.push((current.0 - rot_offset.0, current.1 - rot_offset.1, rot))
+                move_list.push(Move::new(
+                    Action::RotateCounterclockwise,
+                    (
+                        dest.0 - rot_offset.0,
+                        dest.1 - rot_offset.1,
+                        wrap_rot(dest.2 - 1, rot_num),
+                    ),
+                ));
             }
 
-            rot_offset = ROTATION_OFFSETS[self.current_piece - 1][current.2 as usize];
+            rot = wrap_rot(dest.2, rot_num) as usize;
+            rot_offset = ROTATION_OFFSETS[self.current_piece - 1][rot];
+            piece = &PIECES[self.current_piece - 1][rot];
 
             if !check_colision(
                 &self.board,
                 piece,
-                current.0 + rot_offset.0,
-                current.1 + rot_offset.1,
+                dest.0 + rot_offset.0,
+                dest.1 + rot_offset.1,
             ) {
-                move_list.push((
-                    current.0 + rot_offset.0,
-                    current.1 + rot_offset.1,
-                    (current.2 + 1) % rot_num,
-                ))
+                move_list.push(Move::new(
+                    Action::RotateClockwise,
+                    (
+                        dest.0 + rot_offset.0,
+                        dest.1 + rot_offset.1,
+                        wrap_rot(dest.2 + 1, rot_num),
+                    ),
+                ));
             }
 
-            for next in move_list.iter() {
-                let new_cost = cost_so_far.get(&current).unwrap() + 1;
-                if !cost_so_far.contains_key(next) || new_cost < *cost_so_far.get(next).unwrap() {
-                    cost_so_far.insert(*next, new_cost);
-                    let priority = new_cost + dist3(*next, goal);
-                    frontier.push(Action {
-                        coord: *next,
-                        priority,
-                    });
-                    came_from.insert(*next, Some(current));
+            for &next in move_list.iter() {
+                // Lower costs to higher actions
+                // let c = match next.action {
+                //     Action::SoftDrop => 1,
+                //     _ => next.dest.1 + 1
+                // };
+
+                let new_cost = cost_so_far.get(&current.dest).unwrap() + 1;
+                if !cost_so_far.contains_key(&next.dest)
+                    || new_cost < *cost_so_far.get(&next.dest).unwrap()
+                {
+                    cost_so_far.insert(next.dest, new_cost);
+                    let priority = new_cost + proximity(next.dest, goal, rot_num);
+                    frontier.push(OrderedMove::new(next, priority));
+                    came_from.insert(next.dest, Some(current));
                 }
             }
         }
 
         let mut current = goal;
         let mut path = Vec::new();
+        let mut mv: Option<Move> = goal_mv;
         while current != start {
-            path.push(current);
-            current = came_from.get(&current).unwrap().unwrap();
+            if let Some(mv) = mv {
+                path.push(mv.action);
+            }
+            mv = *came_from.get(&current).unwrap();
+            current = mv.unwrap().dest;
         }
 
-        path.push(start);
-
-        // path.push((0, 0, 0));
-
-        // let mut current = goal;
-        // let mut last = current;
-
-        // while current != start {
-        //     let diff = diff3(current, last);
-
-        //     if diff == (0, 1, 0) {
-        //         path.push((0, 0, 0))
-        //     } else {
-        //         let current_action = path.last_mut().unwrap();
-        //         *current_action = add3(*current_action, diff)
-        //     }
-
-        //     last = current;
-        //     current = came_from.get(&current).unwrap().unwrap();
-        // }
-
-
+        path.reverse();
 
         path
     }
@@ -308,8 +336,6 @@ impl Position {
         cache.insert((x, y, rot));
 
         let piece = &PIECES[piece_idx][rot as usize];
-        let size_x = piece[0].len() as i32;
-        let size_y = piece.len() as i32;
 
         if check_colision(&self.board, piece, x, y) {
             return false;
@@ -362,7 +388,7 @@ impl Position {
         false
     }
 
-    pub fn gen_legal_moves(&self) -> Vec<(usize, usize, usize)> {
+    pub fn legal_moves(&self) -> Vec<(usize, usize, usize)> {
         let mut legal_moves = Vec::new();
         let mut open_air_mask = vec![vec![1; BOARD_WIDTH]; BOARD_HEIGHT];
         let mut cache = FxHashSet::default();
@@ -557,16 +583,6 @@ impl Default for Position {
     }
 }
 
-impl Hasher for Position {
-    fn finish(&self) -> u64 {
-        todo!()
-    }
-
-    fn write(&mut self, bytes: &[u8]) {
-        todo!()
-    }
-}
-
 fn check_colision(board: &Board, piece: &Piece, x: i32, y: i32) -> bool {
     let size_x = piece[0].len() as i32;
     let size_y = piece.len() as i32;
@@ -587,22 +603,21 @@ fn check_colision(board: &Board, piece: &Piece, x: i32, y: i32) -> bool {
     false
 }
 
-fn add3(a: (i32, i32, i32), b: (i32, i32, i32)) -> (i32, i32, i32) {
-    (a.0 + b.0, a.1 + b.1, a.2 + b.2)
+fn wrap_rot(rot: i32, dim: i32) -> i32 {
+    (rot % dim + dim) % dim
 }
 
-fn diff3(a: (i32, i32, i32), b: (i32, i32, i32)) -> (i32, i32, i32) {
-    (a.0 - b.0, a.1 - b.1, a.2 - b.2)
+fn rotation_index(rotation: i32, dim: i32) -> usize {
+    ((rotation % dim + dim) % dim) as usize
 }
 
-fn dist3(a: (i32, i32, i32), b: (i32, i32, i32)) -> i32 {
-    (a.0 - b.0).abs() + (a.1 - b.1).abs() + (a.2 - b.2).abs()
+fn proximity(a: (i32, i32, i32), b: (i32, i32, i32), rot_dim: i32) -> i32 {
+    (a.0 - b.0).abs() + cmp::min(wrap_rot(a.2 - b.2, rot_dim), wrap_rot(b.2 - a.2, rot_dim))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_features() {
         let board = vec![
@@ -664,7 +679,7 @@ mod tests {
             vec![1, 1, 0, 1, 1, 1, 1, 1, 1, 1],
         ];
 
-        let moves = Position::new(6, 1, 0, 0, board).gen_legal_moves();
+        let moves = Position::new(6, 1, 0, 0, board).legal_moves();
 
         let expected = vec![
             (0, 18, 0),
@@ -736,6 +751,6 @@ mod tests {
             vec![2, 2, 0, 0, 4, 4, 7, 7, 7, 7],
         ];
 
-        Position::new(6, 1, 0, 0, board).gen_legal_moves();
+        Position::new(6, 1, 0, 0, board).legal_moves();
     }
 }

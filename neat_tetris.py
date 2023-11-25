@@ -133,14 +133,13 @@ if __name__ == "__main__":
 
         board = np.array(pos["board"])
 
-        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board, 30)
+        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board, 60)
         while True:
             move = play_engine.go()
 
             action_list = move["action_list"]
 
             graphic.action_list = action_list
-
 
             graphic.board = np.array(pos["board"])
             graphic.current_piece = pos["current_piece"]

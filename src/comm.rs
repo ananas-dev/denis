@@ -2,7 +2,7 @@ use std::{collections::VecDeque, io};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{net::FeedForwardNetwork, pos::Position, search};
+use crate::{net::FeedForwardNetwork, pos::{Position, Action}, search};
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
@@ -29,7 +29,7 @@ enum In {
 #[serde(tag = "type")]
 enum Out {
     Move {
-        action_list: Vec<(i32, i32, i32)>,
+        action_list: Vec<Action>,
     },
     Pos {
         score: i64,

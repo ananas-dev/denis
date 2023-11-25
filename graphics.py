@@ -113,7 +113,7 @@ ROTATION_TABLE = [
     [(1, -1), (-1, 1)], # Z
 ]
 
-SPAWNS = [(3, 3), (2, 4), (2, 3), (2, 3), (2, 3), (2, 3), (2, 3)]
+SPAWNS = [(3, 1), (4, 0), (3, 0), (3, 0), (3, 0), (3, 0), (3, 0)]
 
 class Graphic():
 
@@ -244,9 +244,36 @@ class Graphic():
         Args:
             action_list (list): list of actions to perform
         """
-        for x, y, r in self.action_list:
+        x_offset, y_offset = SPAWNS[self.current_piece-1]
+        rot = 0
+        self.draw_piece(self.current_piece, (y_offset, x_offset), rotation=rot)
+        pg.display.update()
+        for action in self.action_list:
+            if action == "SoftDrop":
+                self.clock.tick(self.fps)
+                self.clock.tick(self.fps)
+                y_offset += 1
+            elif action == "MoveLeft":
+                x_offset -= 1
+            elif action == "MoveRight":
+                x_offset += 1
+            elif action == "RotateCounterclockwise":
+                rot_num = len(ROTATION_TABLE[self.current_piece - 1])
+                offsets = ROTATION_TABLE[self.current_piece - 1][rot - 1]
+                rot = (rot - 1) % rot_num
+                x_offset -= offsets[0]
+                y_offset -= offsets[1]
+            elif action == "RotateClockwise":
+                rot_num = len(ROTATION_TABLE[self.current_piece - 1])
+                offsets = ROTATION_TABLE[self.current_piece - 1][rot]
+                rot = (rot + 1) % rot_num
+                x_offset += offsets[0]
+                y_offset += offsets[1]
+            else:
+                assert False, "Unknown action!"
+            
             self.fill_gradient(self.display, self.bg_color_1, self.bg_color_2, vertical=False, forward=True)
-            self.draw_piece(self.current_piece, (y, x), rotation=r)
+            self.draw_piece(self.current_piece, (y_offset, x_offset), rotation=rot)
             self.draw_board()
             self.draw_grid()
             self.show_score()
