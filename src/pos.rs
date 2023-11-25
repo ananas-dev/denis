@@ -2,7 +2,11 @@ use lazy_static::lazy_static;
 use rand::Rng;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Serialize;
-use std::{cmp::{self, Ordering}, collections::BinaryHeap, fmt};
+use std::{
+    cmp::{self, Ordering},
+    collections::BinaryHeap,
+    fmt,
+};
 
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 22;
@@ -126,7 +130,24 @@ lazy_static! {
 
     static ref SPAWNS: Vec<(i32, i32, i32)> = vec![(3, 1, 0), (4, 0, 0), (3, 0, 0), (3, 0, 0), (3, 0, 0), (3, 0, 0), (3, 0, 0)];
 
+    static ref ZOBRISTS: Vec<Vec<Vec<u64>>> = {
+        let mut rng = rand::thread_rng();
 
+        let mut board = Vec::new();
+        for _ in  0..BOARD_HEIGHT {
+            let mut row = Vec::new();
+            for _ in 0..BOARD_WIDTH {
+                let mut coord = Vec::new();
+                for _ in 0..7 {
+                    coord.push(rng.gen::<u64>());
+                }
+                row.push(coord);
+            }
+            board.push(row);
+        }
+
+        board
+    };
 }
 
 #[derive(Debug)]
@@ -134,7 +155,6 @@ pub struct Features {
     pub holes: f64,
     pub bumpiness: f64,
     pub aggregate_height: f64,
-    pub completed_lines: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash, Serialize)]
@@ -188,24 +208,24 @@ pub struct Position {
     pub score: i64,
     pub current_piece: usize,
     pub next_piece: usize,
-    pub lines: usize,
     pub board: Board,
+    pub hash: u64,
 }
 
 impl Position {
     pub fn new(
         current_piece: usize,
         next_piece: usize,
-        lines: usize,
         score: i64,
         board: Board,
+        hash: u64,
     ) -> Self {
         Position {
             current_piece,
             next_piece,
-            lines,
             score,
             board,
+            hash,
         }
     }
 
@@ -234,7 +254,8 @@ impl Position {
                 break;
             }
 
-            let mut piece = &PIECES[self.current_piece - 1][wrap_rot(current.dest.2, rot_num) as usize];
+            let mut piece =
+                &PIECES[self.current_piece - 1][wrap_rot(current.dest.2, rot_num) as usize];
 
             let mut move_list = Vec::new();
 
@@ -442,6 +463,10 @@ impl Position {
         legal_moves
     }
 
+    pub fn hash(&self) -> u64 {
+        self.hash
+    }
+
     pub fn features(&self) -> Features {
         let mut holes = 0;
         let mut heights: [f64; BOARD_WIDTH] = [0.; BOARD_WIDTH];
@@ -476,7 +501,6 @@ impl Position {
             holes: holes as f64,
             aggregate_height,
             bumpiness,
-            completed_lines: self.lines as f64,
         }
     }
 
@@ -496,19 +520,22 @@ impl Position {
         next_piece
     }
 
-    pub fn apply_move(&self, x: usize, y: usize, rot: usize) -> Option<Position> {
+    pub fn apply_move(&self, x: usize, y: usize, rot: usize, gen_next: bool) -> Option<Position> {
         let piece = &PIECES[self.current_piece - 1][rot];
         let size_x = piece[0].len();
         let size_y = piece.len();
 
         let mut new_board = self.board.clone();
         let mut new_score = self.score;
+        let mut new_hash = self.hash;
 
         // Place the piece
         for i in 0..size_x {
             for j in 0..size_y {
                 if new_board[y + j][x + i] == 0 && piece[j][i] != 0 {
-                    new_board[y + j][x + i] = piece[j][i]
+                    let piece_type = piece[j][i];
+                    new_board[y + j][x + i] = piece_type;
+                    new_hash ^= ZOBRISTS[y + j][x + i][piece_type - 1];
                 }
             }
         }
@@ -519,9 +546,28 @@ impl Position {
             let full_line = new_board[j].iter().all(|&cell| cell != 0);
 
             if full_line {
+                let new_board_copy = new_board.clone();
                 line_count += 1;
-                new_board.remove(j);
-                new_board.insert(0, vec![0; BOARD_WIDTH]);
+                for y in 0..j {
+                    for x in 0..BOARD_WIDTH {
+                        let piece_type = self.board[y][x];
+                        let old_piece_type = self.board[y+1][x];
+
+                        if old_piece_type != 0 {
+                            new_hash ^= ZOBRISTS[y+1][x][old_piece_type - 1];
+                        }
+
+                        if piece_type != 0 {
+                            new_hash ^= ZOBRISTS[y+1][x][piece_type - 1];
+                        }
+
+                        new_board[y + 1][x] = new_board_copy[y][x];
+                    }
+                }
+
+                for x in 0..BOARD_WIDTH {
+                    new_hash ^= ZOBRISTS[y][x][0];
+                }
             }
         }
 
@@ -542,25 +588,16 @@ impl Position {
 
         return Some(Position::new(
             self.next_piece,
-            Position::gen_piece(self.next_piece),
-            self.lines + line_count,
+            if gen_next {
+                Position::gen_piece(self.next_piece)
+            } else {
+                0
+            },
             new_score,
             new_board,
+            new_hash,
         ));
     }
-
-    // fn get_hash(&self) -> u64 {
-    //     let mut hash = 0;
-
-    //     for x in 0..BOARD_WIDTH {
-    //         for y in 0..BOARD_HEIGHT {
-    //             let piece = self.board[y][x] as usize;
-    //             // hash ^= ZOBRIST[(y * BOARD_HEIGHT + x) * (22 * BOARD_WIDTH) + piece];
-    //         }
-    //     }
-
-    //     hash
-    // }
 }
 
 impl fmt::Display for Position {
@@ -578,13 +615,14 @@ impl fmt::Display for Position {
 impl Default for Position {
     fn default() -> Self {
         let current_piece = Position::gen_piece(0);
+        let board = vec![vec![0; BOARD_WIDTH]; BOARD_HEIGHT];
 
         Self {
             current_piece: Position::gen_piece(0),
             next_piece: Position::gen_piece(current_piece),
-            lines: 0,
             score: 0,
-            board: vec![vec![0; BOARD_WIDTH]; BOARD_HEIGHT],
+            hash: hash_board(&board),
+            board,
         }
     }
 }
@@ -614,8 +652,22 @@ fn wrap_rot(rot: i32, dim: i32) -> i32 {
 }
 
 fn proximity(a: (i32, i32, i32), b: (i32, i32, i32), rot_dim: i32) -> i32 {
-    (a.0 - b.0).abs()
-    + cmp::min(wrap_rot(a.2 - b.2, rot_dim), wrap_rot(b.2 - a.2, rot_dim))
+    (a.0 - b.0).abs() + cmp::min(wrap_rot(a.2 - b.2, rot_dim), wrap_rot(b.2 - a.2, rot_dim))
+}
+
+fn hash_board(board: &Board) -> u64 {
+    let mut hash = 0;
+
+    for x in 0..BOARD_WIDTH {
+        for y in 0..BOARD_HEIGHT {
+            let piece = board[y][x] as usize;
+            if piece != 0 {
+                hash ^= ZOBRISTS[y][x][piece - 1];
+            }
+        }
+    }
+
+    hash
 }
 
 #[cfg(test)]
@@ -648,7 +700,7 @@ mod tests {
             vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         ];
 
-        let feat = Position::new(1, 1, 0, 0, board).features();
+        let feat = Position::new(1, 1, 0, board, 0).features();
 
         assert_eq!(feat.bumpiness, 6.);
         assert_eq!(feat.aggregate_height, 48.);
@@ -682,7 +734,7 @@ mod tests {
             vec![1, 1, 0, 1, 1, 1, 1, 1, 1, 1],
         ];
 
-        let moves = Position::new(6, 1, 0, 0, board).legal_moves();
+        let moves = Position::new(6, 1, 0, board, 0).legal_moves();
 
         let expected = vec![
             (0, 18, 0),
@@ -754,6 +806,6 @@ mod tests {
             vec![2, 2, 0, 0, 4, 4, 7, 7, 7, 7],
         ];
 
-        Position::new(6, 1, 0, 0, board).legal_moves();
+        Position::new(6, 1, 0, board, 0).legal_moves();
     }
 }

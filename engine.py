@@ -19,7 +19,7 @@ class Engine:
             try:
                 return json.loads(raw_message)
             except:
-                print(raw_message)
+                assert False, "Unknown message:" + raw_message
 
     def load(self, input_nodes, output_nodes, node_evals):
         msg = {

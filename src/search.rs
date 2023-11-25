@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use crate::{net::FeedForwardNetwork, pos::{Position, Action}};
 
 pub fn find_best_move(net: &mut FeedForwardNetwork, pos: &Position) -> ((usize, usize, usize), Vec<Action>) {
@@ -5,7 +7,7 @@ pub fn find_best_move(net: &mut FeedForwardNetwork, pos: &Position) -> ((usize, 
     let mut best_move = (0, 0, 0);
 
     for &(x, y, rot) in pos.legal_moves().iter() {
-        if let Some(pos) = pos.apply_move(x, y, rot) {
+        if let Some(pos) = pos.apply_move(x, y, rot, false) {
             let score = search(net, pos, 1);
 
             if score > maxscore {
@@ -33,7 +35,7 @@ fn search(net: &mut FeedForwardNetwork, pos: Position, depth: usize) -> f64 {
         let features = pos.features();
 
         return net.activate(vec![
-            features.completed_lines,
+            0.,
             features.holes,
             features.bumpiness,
             features.aggregate_height,
@@ -43,7 +45,7 @@ fn search(net: &mut FeedForwardNetwork, pos: Position, depth: usize) -> f64 {
     let mut maxscore = -f64::INFINITY;
 
     for &(x, y, rot) in pos.legal_moves().iter() {
-        if let Some(pos) = pos.apply_move(x, y, rot) {
+        if let Some(pos) = pos.apply_move(x, y, rot, false) {
             let score = search(net, pos, depth - 1);
 
             if score > maxscore {

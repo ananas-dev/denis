@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, io};
+use std::io;
 
 use serde::{Deserialize, Serialize};
 
@@ -16,8 +16,8 @@ enum In {
         score: i64,
         current_piece: usize,
         next_piece: usize,
-        lines: usize,
         board: Vec<Vec<usize>>,
+        hash: u64,
     },
     Peek,
     PlayGame,
@@ -35,8 +35,8 @@ enum Out {
         score: i64,
         current_piece: usize,
         next_piece: usize,
-        lines: usize,
         board: Vec<Vec<usize>>,
+        hash: u64,
     },
     GameResult {
         score: i64,
@@ -78,17 +78,16 @@ pub fn start() -> io::Result<()> {
                 score,
                 current_piece,
                 next_piece,
-                lines,
                 board,
+                hash,
             } => {
-                pos = Position::new(current_piece, next_piece, lines, score, board);
+                pos = Position::new(current_piece, next_piece, score, board, hash);
                 total_moves = 0;
             }
             In::Go => {
                 if let Some(nn) = &mut net {
                     let (best, action_list) = search::find_best_move(nn, &pos);
-                    pos.lines = 0;
-                    pos = pos.apply_move(best.0, best.1, best.2).unwrap();
+                    pos = pos.apply_move(best.0, best.1, best.2, true).unwrap();
                     send(&Out::Move { action_list })?;
                 }
             }
@@ -99,19 +98,17 @@ pub fn start() -> io::Result<()> {
                         score: pos.score,
                         current_piece: pos.current_piece,
                         next_piece: pos.next_piece,
-                        lines: pos.lines,
                         board: pos.board.clone(),
+                        hash: pos.hash,
                     })?
                 )
             }
             In::PlayGame => {
                 if let Some(nn) = &mut net {
-                    pos.lines = 0;
                     let (mut best, _) = search::find_best_move(nn, &pos);
-                    while let Some(new_pos) = pos.apply_move(best.0, best.1, best.2) {
+                    while let Some(new_pos) = pos.apply_move(best.0, best.1, best.2, true) {
                         if total_moves <= 500 {
                             pos = new_pos;
-                            pos.lines = 0;
                             best = search::find_best_move(nn, &pos).0;
                             total_moves += 1;
                         } else {
