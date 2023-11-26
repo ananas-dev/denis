@@ -1,8 +1,12 @@
-use std::io;
+use std::{io, str::FromStr, time::Instant};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{net::FeedForwardNetwork, pos::{Position, Action}, search};
+use crate::{
+    net::FeedForwardNetwork,
+    pos::{Action, Position},
+    search,
+};
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
@@ -13,11 +17,7 @@ enum In {
         node_evals: Vec<(i64, f64, f64, Vec<(i64, f64)>)>,
     },
     Pos {
-        score: i64,
-        current_piece: usize,
-        next_piece: usize,
-        board: Vec<Vec<usize>>,
-        hash: u64,
+        tpn: String,
     },
     Peek,
     PlayGame,
@@ -28,19 +28,9 @@ enum In {
 #[derive(Serialize)]
 #[serde(tag = "type")]
 enum Out {
-    Move {
-        action_list: Vec<Action>,
-    },
-    Pos {
-        score: i64,
-        current_piece: usize,
-        next_piece: usize,
-        board: Vec<Vec<usize>>,
-        hash: u64,
-    },
-    GameResult {
-        score: i64,
-    },
+    Move { action_list: Vec<Action> },
+    Pos { tpn: String },
+    GameResult { score: i64 },
     Ok,
     Ko,
 }
@@ -74,14 +64,9 @@ pub fn start() -> io::Result<()> {
                     node_evals,
                 ));
             }
-            In::Pos {
-                score,
-                current_piece,
-                next_piece,
-                board,
-                hash,
-            } => {
-                pos = Position::new(current_piece, next_piece, score, board, hash);
+            In::Pos { tpn } => {
+                // TODO: Clean error handling
+                pos = Position::from_str(&tpn).unwrap();
                 total_moves = 0;
             }
             In::Go => {
@@ -95,11 +80,7 @@ pub fn start() -> io::Result<()> {
                 println!(
                     "{}",
                     serde_json::to_string(&Out::Pos {
-                        score: pos.score,
-                        current_piece: pos.current_piece,
-                        next_piece: pos.next_piece,
-                        board: pos.board.clone(),
-                        hash: pos.hash,
+                        tpn: pos.to_string()
                     })?
                 )
             }

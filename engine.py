@@ -1,5 +1,6 @@
 import subprocess
 import json
+import tpn
 
 class Engine:
     def __init__(self, path):
@@ -38,25 +39,20 @@ class Engine:
         return response["score"]
 
     def pos(self, pos):
-        msg = {
-            "type": "Pos",
-            "score": pos["score"],
-            "current_piece": pos["current_piece"],
-            "next_piece": pos["next_piece"],
-            "board": pos["board"]
-        }
-
-        self.send_message(msg)
+        assert False, "Out of date"
 
     def go(self):
         msg = { "type": "Go" }
         self.send_message(msg)
         return self.receive_message()
+
     
     def peek(self):
         msg = { "type": "Peek" }
         self.send_message(msg)
-        return self.receive_message()
+        out = self.receive_message()
+        print(out)
+        return tpn.loads(out["tpn"])
 
     def ready(self):
         msg = { "type": "Ready" }

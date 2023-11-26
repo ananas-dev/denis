@@ -6,12 +6,14 @@ use std::{
     cmp::{self, Ordering},
     collections::BinaryHeap,
     fmt,
+    str::FromStr,
 };
 
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 22;
+const BOARD_SIZE: usize = BOARD_WIDTH * BOARD_HEIGHT;
 
-type Board = Vec<Vec<usize>>;
+type Board = [[usize; BOARD_WIDTH]; BOARD_HEIGHT];
 type Piece = Vec<Vec<usize>>;
 
 lazy_static! {
@@ -148,6 +150,70 @@ lazy_static! {
 
         board
     };
+}
+
+#[repr(u8)]
+pub enum PieceKind {
+    None,
+    I,
+    O,
+    J,
+    L,
+    S,
+    T,
+    Z,
+}
+
+// TODO: custom error type
+impl TryFrom<char> for PieceKind {
+    type Error = ();
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            'I' => Ok(PieceKind::I),
+            'O' => Ok(PieceKind::O),
+            'J' => Ok(PieceKind::J),
+            'L' => Ok(PieceKind::L),
+            'S' => Ok(PieceKind::S),
+            'T' => Ok(PieceKind::T),
+            'Z' => Ok(PieceKind::Z),
+            _ => Err(()),
+        }
+    }
+}
+
+impl fmt::Display for PieceKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                PieceKind::I => 'I',
+                PieceKind::O => 'O',
+                PieceKind::J => 'J',
+                PieceKind::L => 'L',
+                PieceKind::S => 'S',
+                PieceKind::T => 'T',
+                PieceKind::Z => 'Z',
+                _ => ' ',
+            }
+        )?;
+
+        Ok(())
+    }
+}
+
+fn temp_piece_into(p: usize) -> char {
+    match p {
+        1 => 'I',
+        2 => 'O',
+        3 => 'J',
+        4 => 'L',
+        5 => 'S',
+        6 => 'T',
+        7 => 'Z',
+        _ => panic!(),
+    }
 }
 
 #[derive(Debug)]
@@ -385,8 +451,7 @@ impl Position {
         }
 
         let rot_num = *&ROTATION_OFFSETS[piece_idx].len() as i32;
-        let mut rot_offset =
-            ROTATION_OFFSETS[piece_idx][(((rot - 1) % rot_num + rot_num) % rot_num) as usize];
+        let mut rot_offset = ROTATION_OFFSETS[piece_idx][wrap_rot(rot - 1, rot_num) as usize];
 
         if self.pathfind_open_air(
             open_air_mask,
@@ -417,7 +482,7 @@ impl Position {
 
     pub fn legal_moves(&self) -> Vec<(usize, usize, usize)> {
         let mut legal_moves = Vec::new();
-        let mut open_air_mask = vec![vec![1; BOARD_WIDTH]; BOARD_HEIGHT];
+        let mut open_air_mask = [[1; BOARD_WIDTH]; BOARD_HEIGHT];
         let mut cache = FxHashSet::default();
 
         for x in 0..BOARD_WIDTH {
@@ -551,14 +616,14 @@ impl Position {
                 for y in 0..j {
                     for x in 0..BOARD_WIDTH {
                         let piece_type = self.board[y][x];
-                        let old_piece_type = self.board[y+1][x];
+                        let old_piece_type = self.board[y + 1][x];
 
                         if old_piece_type != 0 {
-                            new_hash ^= ZOBRISTS[y+1][x][old_piece_type - 1];
+                            new_hash ^= ZOBRISTS[y + 1][x][old_piece_type - 1];
                         }
 
                         if piece_type != 0 {
-                            new_hash ^= ZOBRISTS[y+1][x][piece_type - 1];
+                            new_hash ^= ZOBRISTS[y + 1][x][piece_type - 1];
                         }
 
                         new_board[y + 1][x] = new_board_copy[y][x];
@@ -600,22 +665,10 @@ impl Position {
     }
 }
 
-impl fmt::Display for Position {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for y in 0..BOARD_HEIGHT {
-            for x in 0..BOARD_WIDTH {
-                write!(f, "{} ", self.board[y][x])?;
-            }
-            write!(f, "\n")?;
-        }
-        Ok(())
-    }
-}
-
 impl Default for Position {
     fn default() -> Self {
         let current_piece = Position::gen_piece(0);
-        let board = vec![vec![0; BOARD_WIDTH]; BOARD_HEIGHT];
+        let board = [[0; BOARD_WIDTH]; BOARD_HEIGHT];
 
         Self {
             current_piece: Position::gen_piece(0),
@@ -624,6 +677,89 @@ impl Default for Position {
             hash: hash_board(&board),
             board,
         }
+    }
+}
+
+impl fmt::Display for Position {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut empty_cells = 0;
+        for y in 0..BOARD_HEIGHT {
+            for x in 0..BOARD_WIDTH {
+                if self.board[y][x] != 0 && empty_cells > 0 && empty_cells < 10 {
+                    write!(f, "{}", empty_cells)?;
+                    empty_cells = 0;
+                }
+
+                if self.board[y][x] != 0 {
+                    write!(f, "{}", temp_piece_into(self.board[y][x]))?;
+                } else {
+                    empty_cells += 1;
+                }
+            }
+
+            if empty_cells > 0 && empty_cells < 10 {
+                write!(f, "{}", empty_cells)?;
+            }
+
+            write!(f, "/")?;
+            empty_cells = 0;
+
+        }
+
+        write!(
+            f,
+            " {} {} {}",
+            temp_piece_into(self.current_piece),
+            temp_piece_into(self.next_piece),
+            self.score
+        )?;
+
+        Ok(())
+    }
+}
+
+// TODO: overflow error handling
+impl FromStr for Position {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut board = [[0; BOARD_WIDTH]; BOARD_HEIGHT];
+        let mut curr_x = 0;
+        let mut curr_y = 0;
+
+        let tokens: Vec<&str> = s.split(' ').collect();
+        if tokens.len() < 3 {
+            return Err(());
+        }
+
+        let board_tok = tokens[0];
+        let curr_piece_tok = tokens[1];
+        let next_piece_tok = tokens[2];
+        let score_tok = tokens[3];
+
+        for x in board_tok.chars() {
+            match x {
+                '/' => {
+                    curr_x = 0;
+                    curr_y += 1;
+                }
+                '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {
+                    curr_x += (x as usize) - ('0' as usize)
+                }
+                _ => {
+                    let piece = PieceKind::try_from(x)?;
+                    board[curr_y][curr_x] = piece as usize;
+                    curr_x += 1;
+                }
+            }
+        }
+
+        let current_piece = PieceKind::try_from(curr_piece_tok.chars().next().ok_or(())?)? as usize;
+        let next_piece = PieceKind::try_from(next_piece_tok.chars().next().ok_or(())?)? as usize;
+        let score = i64::from_str(score_tok).map_err(|e| ())?;
+
+        let hash = hash_board(&board);
+        Ok(Position::new(current_piece, next_piece, score, board, hash))
     }
 }
 
@@ -672,140 +808,18 @@ fn hash_board(board: &Board) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    #[test]
-    fn test_features() {
-        let board = vec![
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
-            vec![0, 1, 1, 1, 1, 1, 1, 0, 0, 1],
-            vec![0, 1, 1, 0, 1, 1, 1, 1, 1, 1],
-            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            vec![1, 1, 1, 0, 1, 1, 1, 1, 1, 1],
-            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        ];
-
-        let feat = Position::new(1, 1, 0, board, 0).features();
-
-        assert_eq!(feat.bumpiness, 6.);
-        assert_eq!(feat.aggregate_height, 48.);
-        assert_eq!(feat.holes, 2.);
-    }
+    use crate::pos::{temp_piece_into, Position};
 
     #[test]
-    fn test_gen_moves() {
-        let board = vec![
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![1, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-            vec![1, 0, 0, 0, 1, 1, 1, 1, 1, 1],
-            vec![1, 1, 0, 1, 1, 1, 1, 1, 1, 1],
-        ];
-
-        let moves = Position::new(6, 1, 0, board, 0).legal_moves();
-
-        let expected = vec![
-            (0, 18, 0),
-            (1, 18, 0),
-            (1, 20, 0),
-            (2, 17, 0),
-            (3, 18, 0),
-            (4, 18, 0),
-            (5, 18, 0),
-            (6, 18, 0),
-            (7, 18, 0),
-            (0, 17, 1),
-            (1, 19, 1),
-            (2, 16, 1),
-            (3, 17, 1),
-            (4, 17, 1),
-            (5, 17, 1),
-            (6, 17, 1),
-            (7, 17, 1),
-            (8, 17, 1),
-            (0, 17, 2),
-            (1, 17, 2),
-            (1, 19, 2),
-            (2, 17, 2),
-            (3, 17, 2),
-            (4, 18, 2),
-            (5, 18, 2),
-            (6, 18, 2),
-            (7, 18, 2),
-            (0, 16, 3),
-            (1, 18, 3),
-            (2, 17, 3),
-            (2, 19, 3),
-            (3, 16, 3),
-            (4, 17, 3),
-            (5, 17, 3),
-            (6, 17, 3),
-            (7, 17, 3),
-            (8, 17, 3),
-        ];
-
-        assert_eq!(moves, expected)
-    }
-
-    #[test]
-    fn stack_overflow() {
-        let board = vec![
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec![0, 0, 0, 5, 0, 1, 1, 1, 1, 0],
-            vec![0, 0, 0, 5, 5, 1, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 5, 1, 0, 0, 0, 0],
-            vec![0, 0, 0, 0, 4, 1, 0, 0, 0, 0],
-            vec![2, 2, 0, 0, 4, 1, 7, 0, 7, 0],
-            vec![2, 2, 0, 0, 4, 4, 7, 7, 7, 7],
-        ];
-
-        Position::new(6, 1, 0, board, 0).legal_moves();
+    fn test_empty_tpn() {
+        let pos = Position::default();
+        assert_eq!(
+            pos.to_string(),
+            format!(
+                "////////////////////// {} {} 0",
+                temp_piece_into(pos.current_piece),
+                temp_piece_into(pos.next_piece)
+            )
+        );
     }
 }

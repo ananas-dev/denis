@@ -4,6 +4,7 @@ import neat
 import pickle # Used to save the model
 import graphics
 import engine
+import tpn
 
 
 ### TRAINING PARAMETERS ###
@@ -131,9 +132,9 @@ if __name__ == "__main__":
 
         pos = play_engine.peek()
 
-        board = np.array(pos["board"])
+        board = np.array(pos.board)
 
-        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board, 60)
+        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board, 100)
         while True:
             move = play_engine.go()
 
@@ -141,10 +142,10 @@ if __name__ == "__main__":
 
             graphic.action_list = action_list
 
-            graphic.board = np.array(pos["board"])
-            graphic.current_piece = pos["current_piece"]
-            graphic.next_pieces = [pos["next_piece"]]
-            graphic.score = pos["score"]
+            graphic.board = np.array(pos.board)
+            graphic.current_piece = pos.current_piece
+            graphic.next_pieces = [pos.next_piece]
+            graphic.score = pos.score
 
             graphic.tick()
             graphic.draw()
