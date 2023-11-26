@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use lazy_static::lazy_static;
 use rand::Rng;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -11,7 +12,6 @@ use std::{
 
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 22;
-const BOARD_SIZE: usize = BOARD_WIDTH * BOARD_HEIGHT;
 
 type Board = [[usize; BOARD_WIDTH]; BOARD_HEIGHT];
 type Piece = Vec<Vec<usize>>;
@@ -154,7 +154,6 @@ lazy_static! {
 
 #[repr(u8)]
 pub enum PieceKind {
-    None,
     I,
     O,
     J,
@@ -195,7 +194,6 @@ impl fmt::Display for PieceKind {
                 PieceKind::S => 'S',
                 PieceKind::T => 'T',
                 PieceKind::Z => 'Z',
-                _ => ' ',
             }
         )?;
 
@@ -323,7 +321,7 @@ impl Position {
             let mut piece =
                 &PIECES[self.current_piece - 1][wrap_rot(current.dest.2, rot_num) as usize];
 
-            let mut move_list = Vec::new();
+            let mut move_list: ArrayVec<Move, 5> = ArrayVec::new();
 
             if !check_colision(&self.board, piece, dest.0 - 1, dest.1) {
                 move_list.push(Move::new(Action::MoveLeft, (dest.0 - 1, dest.1, dest.2)));
