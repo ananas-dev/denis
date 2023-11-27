@@ -1,6 +1,9 @@
 use arrayvec::ArrayVec;
 use lazy_static::lazy_static;
-use rand::Rng;
+use rand::{
+    distributions::Distribution,
+    Rng,
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Serialize;
 use std::{
@@ -193,7 +196,6 @@ trait Cell {
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum Color {
-    Empty,
     I,
     O,
     J,
@@ -201,6 +203,22 @@ pub enum Color {
     S,
     T,
     Z,
+    Empty,
+}
+
+impl From<u8> for Color {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Color::I,
+            1 => Color::O,
+            2 => Color::J,
+            3 => Color::L,
+            4 => Color::S,
+            5 => Color::T,
+            6 => Color::Z,
+            _ => Color::Empty,
+        }
+    }
 }
 
 impl Cell for Color {
@@ -261,19 +279,6 @@ impl fmt::Display for Color {
     }
 }
 
-fn temp_piece_into(p: usize) -> char {
-    match p {
-        1 => 'I',
-        2 => 'O',
-        3 => 'J',
-        4 => 'L',
-        5 => 'S',
-        6 => 'T',
-        7 => 'Z',
-        _ => panic!(),
-    }
-}
-
 #[derive(Debug)]
 pub struct Features {
     pub holes: f64,
@@ -330,16 +335,16 @@ impl PartialOrd for OrderedMove {
 #[derive(Debug)]
 pub struct Position {
     pub score: i64,
-    pub current_piece: usize,
-    pub next_piece: usize,
+    pub current_piece: Color,
+    pub next_piece: Color,
     pub board: Board<Color>,
     pub hash: u64,
 }
 
 impl Position {
     pub fn new(
-        current_piece: usize,
-        next_piece: usize,
+        current_piece: Color,
+        next_piece: Color,
         score: i64,
         board: Board<Color>,
         hash: u64,
@@ -354,11 +359,11 @@ impl Position {
     }
 
     pub fn path(&self, goal: (i32, i32, i32)) -> Vec<Action> {
-        let rot_num = ROTATION_OFFSETS[self.current_piece - 1].len() as i32;
+        let rot_num = ROTATION_OFFSETS[self.current_piece as usize].len() as i32;
 
         let mut goal_mv = None;
 
-        let start = SPAWNS[self.current_piece - 1];
+        let start = SPAWNS[self.current_piece as usize];
         let start_move = OrderedMove::new(Move::new(Action::None, start), 0);
 
         let mut frontier = BinaryHeap::new();
@@ -379,7 +384,7 @@ impl Position {
             }
 
             let mut piece =
-                &PIECES[self.current_piece - 1][wrap_rot(current.dest.2, rot_num) as usize];
+                &PIECES[self.current_piece as usize][wrap_rot(current.dest.2, rot_num) as usize];
 
             let mut move_list: ArrayVec<Move, 5> = ArrayVec::new();
 
@@ -396,9 +401,9 @@ impl Position {
             }
 
             let mut rot = wrap_rot(dest.2 - 1, rot_num) as usize;
-            let mut rot_offset = ROTATION_OFFSETS[self.current_piece - 1][rot];
+            let mut rot_offset = ROTATION_OFFSETS[self.current_piece as usize][rot];
 
-            piece = &PIECES[self.current_piece - 1][rot];
+            piece = &PIECES[self.current_piece as usize][rot];
 
             if !check_colision(
                 &self.board,
@@ -417,8 +422,8 @@ impl Position {
             }
 
             rot = wrap_rot(dest.2, rot_num) as usize;
-            rot_offset = ROTATION_OFFSETS[self.current_piece - 1][rot];
-            piece = &PIECES[self.current_piece - 1][rot];
+            rot_offset = ROTATION_OFFSETS[self.current_piece as usize][rot];
+            piece = &PIECES[self.current_piece as usize][rot];
 
             if !check_colision(
                 &self.board,
@@ -552,7 +557,7 @@ impl Position {
             }
         }
 
-        let piece_kind = &PIECES[self.current_piece - 1];
+        let piece_kind = &PIECES[self.current_piece as usize];
 
         for (rot, piece) in piece_kind.iter().enumerate() {
             let size_x = piece[0].len();
@@ -565,7 +570,7 @@ impl Position {
                         if check_colision(&open_air_mask, piece, x as i32, y as i32) {
                             if self.pathfind_open_air(
                                 &open_air_mask,
-                                self.current_piece - 1,
+                                self.current_piece as usize,
                                 x as i32,
                                 y as i32,
                                 rot as i32,
@@ -596,8 +601,7 @@ impl Position {
                     heights[x] = (BOARD_HEIGHT - y) as f64;
                 }
 
-                if !self.board[y - 1][x].is_empty() && self.board[y][x].is_empty()
-                {
+                if !self.board[y - 1][x].is_empty() && self.board[y][x].is_empty() {
                     holes += 1;
 
                     let mut l = 1;
@@ -624,24 +628,8 @@ impl Position {
         }
     }
 
-    fn gen_piece(prev: usize) -> usize {
-        let mut next_piece = rand::thread_rng().gen_range(1..8);
-
-        if next_piece == prev {
-            let reroll = rand::thread_rng().gen_range(1..7);
-
-            if reroll < next_piece {
-                next_piece = reroll;
-            } else {
-                next_piece = reroll + 1;
-            }
-        }
-
-        next_piece
-    }
-
     pub fn apply_move(&self, x: usize, y: usize, rot: usize, gen_next: bool) -> Option<Position> {
-        let piece = &PIECES[self.current_piece - 1][rot];
+        let piece = &PIECES[self.current_piece as usize][rot];
         let size_x = piece[0].len();
         let size_y = piece.len();
 
@@ -655,7 +643,7 @@ impl Position {
                 if new_board[y + j][x + i].is_empty() && !piece[j][i].is_empty() {
                     let piece_type = piece[j][i];
                     new_board[y + j][x + i] = piece_type;
-                    new_hash ^= ZOBRISTS[y + j][x + i][piece_type as usize - 1];
+                    new_hash ^= ZOBRISTS[y + j][x + i][piece_type as usize];
                 }
             }
         }
@@ -674,11 +662,11 @@ impl Position {
                         let old_piece_type = self.board[y + 1][x];
 
                         if !old_piece_type.is_empty() {
-                            new_hash ^= ZOBRISTS[y + 1][x][old_piece_type as usize - 1];
+                            new_hash ^= ZOBRISTS[y + 1][x][old_piece_type as usize];
                         }
 
                         if !piece_type.is_empty() {
-                            new_hash ^= ZOBRISTS[y + 1][x][piece_type as usize - 1];
+                            new_hash ^= ZOBRISTS[y + 1][x][piece_type as usize];
                         }
 
                         new_board[y + 1][x] = new_board_copy[y][x];
@@ -709,9 +697,9 @@ impl Position {
         return Some(Position::new(
             self.next_piece,
             if gen_next {
-                Position::gen_piece(self.next_piece)
+                self.sample(&mut rand::thread_rng())
             } else {
-                0
+                Color::Empty
             },
             new_score,
             new_board,
@@ -722,15 +710,33 @@ impl Position {
 
 impl Default for Position {
     fn default() -> Self {
-        let current_piece = Position::gen_piece(0);
         let board = [[Color::Empty; BOARD_WIDTH]; BOARD_HEIGHT];
 
+        // TODO: Fix random
         Self {
-            current_piece: Position::gen_piece(0),
-            next_piece: Position::gen_piece(current_piece),
+            current_piece: Color::I,
+            next_piece: Color::J,
             score: 0,
             hash: hash_board(&board),
             board,
+        }
+    }
+}
+
+impl Distribution<Color> for Position {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Color {
+        let next_piece = rng.gen_range(0..7);
+
+        if next_piece == self.next_piece as u8 {
+            let reroll = rng.gen_range(0..6);
+
+            if reroll < next_piece {
+                Color::from(reroll)
+            } else {
+                Color::from(reroll + 1)
+            }
+        } else {
+            Color::from(next_piece)
         }
     }
 }
@@ -763,9 +769,7 @@ impl fmt::Display for Position {
         write!(
             f,
             " {} {} {}",
-            temp_piece_into(self.current_piece),
-            temp_piece_into(self.next_piece),
-            self.score
+            self.current_piece, self.next_piece, self.score
         )?;
 
         Ok(())
@@ -808,8 +812,8 @@ impl FromStr for Position {
             }
         }
 
-        let current_piece = Color::try_from(curr_piece_tok.chars().next().ok_or(())?)? as usize;
-        let next_piece = Color::try_from(next_piece_tok.chars().next().ok_or(())?)? as usize;
+        let current_piece = Color::try_from(curr_piece_tok.chars().next().ok_or(())?)?;
+        let next_piece = Color::try_from(next_piece_tok.chars().next().ok_or(())?)?;
         let score = i64::from_str(score_tok).map_err(|_| ())?;
 
         let hash = hash_board(&board);
@@ -851,9 +855,9 @@ fn hash_board(board: &Board<Color>) -> u64 {
 
     for x in 0..BOARD_WIDTH {
         for y in 0..BOARD_HEIGHT {
-            let piece = board[y][x] as usize;
-            if piece != 0 {
-                hash ^= ZOBRISTS[y][x][piece - 1];
+            let piece = board[y][x];
+            if !piece.is_empty() {
+                hash ^= ZOBRISTS[y][x][piece as usize];
             }
         }
     }
@@ -863,7 +867,7 @@ fn hash_board(board: &Board<Color>) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::pos::{temp_piece_into, Position};
+    use super::*;
 
     #[test]
     fn test_empty_tpn() {
@@ -872,8 +876,7 @@ mod tests {
             pos.to_string(),
             format!(
                 "////////////////////// {} {} 0",
-                temp_piece_into(pos.current_piece),
-                temp_piece_into(pos.next_piece)
+                pos.current_piece, pos.next_piece
             )
         );
     }
