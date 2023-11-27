@@ -26,3 +26,20 @@ impl TranspositionTable {
             .map(|entry| entry.score)
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_set() {
+        let mut tt = TranspositionTable::new(10);
+
+        tt.set(3, 22.);
+
+        assert_eq!(tt.get(3), Some(22.));
+        assert_eq!(tt.get(13), None);
+        assert_eq!(tt.get(1), None);
+    }
+}

@@ -170,18 +170,14 @@ lazy_static! {
 
     static ref SPAWNS: Vec<(i32, i32, i32)> = vec![(3, 1, 0), (4, 0, 0), (3, 0, 0), (3, 0, 0), (3, 0, 0), (3, 0, 0), (3, 0, 0)];
 
-    static ref ZOBRISTS: Vec<Vec<Vec<u64>>> = {
+    static ref ZOBRISTS: Vec<Vec<u64>> = {
         let mut rng = SmallRng::seed_from_u64(0xDEADBEEF12345678);
 
         let mut board = Vec::new();
         for _ in  0..BOARD_HEIGHT {
             let mut row = Vec::new();
             for _ in 0..BOARD_WIDTH {
-                let mut coord = Vec::new();
-                for _ in 0..7 {
-                    coord.push(rng.gen::<u64>());
-                }
-                row.push(coord);
+                row.push(rng.gen::<u64>());
             }
             board.push(row);
         }
@@ -644,7 +640,7 @@ impl Position {
                 if new_board[y + j][x + i].is_empty() && !piece[j][i].is_empty() {
                     let piece_type = piece[j][i];
                     new_board[y + j][x + i] = piece_type;
-                    new_hash ^= ZOBRISTS[y + j][x + i][piece_type as usize];
+                    new_hash ^= ZOBRISTS[y + j][x + i];
                 }
             }
         }
@@ -663,11 +659,11 @@ impl Position {
                         let old_piece_type = new_board_copy[y + 1][x];
 
                         if !old_piece_type.is_empty() {
-                            new_hash ^= ZOBRISTS[y + 1][x][old_piece_type as usize];
+                            new_hash ^= ZOBRISTS[y + 1][x];
                         }
 
                         if !piece_type.is_empty() {
-                            new_hash ^= ZOBRISTS[y + 1][x][piece_type as usize];
+                            new_hash ^= ZOBRISTS[y + 1][x];
                         }
 
                         new_board[y + 1][x] = piece_type;
@@ -854,7 +850,7 @@ fn hash_board(board: &Board<Color>) -> u64 {
         for y in 0..BOARD_HEIGHT {
             let piece = board[y][x];
             if !piece.is_empty() {
-                hash ^= ZOBRISTS[y][x][piece as usize];
+                hash ^= ZOBRISTS[y][x];
             }
         }
     }

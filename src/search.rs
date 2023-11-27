@@ -38,7 +38,6 @@ impl Search {
 
     fn search(&mut self, net: &mut FeedForwardNetwork, pos: Position, depth: usize) -> f64 {
         if depth == 0 {
-
             if let Some(score) = self.tt.get(pos.hash) {
                 return score
             } else {

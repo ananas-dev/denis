@@ -1,4 +1,4 @@
-use std::{io, str::FromStr};
+use std::{io, str::FromStr, time::Instant};
 
 use serde::{Deserialize, Serialize};
 
@@ -50,7 +50,11 @@ pub fn start() -> io::Result<()> {
 
     loop {
         buffer.clear();
-        stdin.read_line(&mut buffer)?;
+        let lenght = stdin.read_line(&mut buffer)?;
+        if lenght == 0 {
+            break;
+        }
+
         let msg_in: In = serde_json::from_str(&buffer).expect("");
 
         match msg_in {
@@ -72,8 +76,11 @@ pub fn start() -> io::Result<()> {
             }
             In::Go => {
                 if let Some(nn) = &mut net {
+                    let start = Instant::now();
                     let (best, action_list) = search.find_best_move(nn, &pos);
                     pos = pos.apply_move(best.0, best.1, best.2, true).unwrap();
+                    let end = Instant::now();
+                    eprintln!("Thinking time: {}", (end - start).as_millis());
                     send(&Out::Move { action_list })?;
                 }
             }
@@ -108,4 +115,6 @@ pub fn start() -> io::Result<()> {
             },
         }
     }
+
+    Ok(())
 }
