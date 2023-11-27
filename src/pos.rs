@@ -3,6 +3,7 @@ use lazy_static::lazy_static;
 use rand::{
     distributions::Distribution,
     Rng,
+    rngs::SmallRng, SeedableRng,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Serialize;
@@ -170,7 +171,7 @@ lazy_static! {
     static ref SPAWNS: Vec<(i32, i32, i32)> = vec![(3, 1, 0), (4, 0, 0), (3, 0, 0), (3, 0, 0), (3, 0, 0), (3, 0, 0), (3, 0, 0)];
 
     static ref ZOBRISTS: Vec<Vec<Vec<u64>>> = {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::seed_from_u64(0xDEADBEEF12345678);
 
         let mut board = Vec::new();
         for _ in  0..BOARD_HEIGHT {
@@ -658,8 +659,8 @@ impl Position {
                 line_count += 1;
                 for y in 0..j {
                     for x in 0..BOARD_WIDTH {
-                        let piece_type = self.board[y][x];
-                        let old_piece_type = self.board[y + 1][x];
+                        let piece_type = new_board_copy[y][x];
+                        let old_piece_type = new_board_copy[y + 1][x];
 
                         if !old_piece_type.is_empty() {
                             new_hash ^= ZOBRISTS[y + 1][x][old_piece_type as usize];
@@ -669,12 +670,8 @@ impl Position {
                             new_hash ^= ZOBRISTS[y + 1][x][piece_type as usize];
                         }
 
-                        new_board[y + 1][x] = new_board_copy[y][x];
+                        new_board[y + 1][x] = piece_type;
                     }
-                }
-
-                for x in 0..BOARD_WIDTH {
-                    new_hash ^= ZOBRISTS[y][x][0];
                 }
             }
         }
@@ -879,5 +876,13 @@ mod tests {
                 pos.current_piece, pos.next_piece
             )
         );
+    }
+
+    #[test]
+    fn test_hash_empty() {
+        let pos1 = Position::default();
+        let pos2 = Position::from_str(&pos1.to_string()).unwrap();
+
+        assert!(pos1.hash == pos2.hash)
     }
 }

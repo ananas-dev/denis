@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     net::FeedForwardNetwork,
     pos::{Action, Position},
-    search,
+    search::Search,
 };
 
 #[derive(Deserialize)]
@@ -46,6 +46,7 @@ pub fn start() -> io::Result<()> {
     let mut pos: Position = Position::default();
     let mut net: Option<FeedForwardNetwork> = None;
     let mut total_moves = 0;
+    let mut search = Search::new();
 
     loop {
         buffer.clear();
@@ -71,7 +72,7 @@ pub fn start() -> io::Result<()> {
             }
             In::Go => {
                 if let Some(nn) = &mut net {
-                    let (best, action_list) = search::find_best_move(nn, &pos);
+                    let (best, action_list) = search.find_best_move(nn, &pos);
                     pos = pos.apply_move(best.0, best.1, best.2, true).unwrap();
                     send(&Out::Move { action_list })?;
                 }
@@ -86,11 +87,11 @@ pub fn start() -> io::Result<()> {
             }
             In::PlayGame => {
                 if let Some(nn) = &mut net {
-                    let (mut best, _) = search::find_best_move(nn, &pos);
+                    let (mut best, _) = search.find_best_move(nn, &pos);
                     while let Some(new_pos) = pos.apply_move(best.0, best.1, best.2, true) {
                         if total_moves <= 500 {
                             pos = new_pos;
-                            best = search::find_best_move(nn, &pos).0;
+                            best = search.find_best_move(nn, &pos).0;
                             total_moves += 1;
                         } else {
                             break;
