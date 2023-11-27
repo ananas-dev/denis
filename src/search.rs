@@ -1,5 +1,3 @@
-use std::time::{Duration, Instant};
-
 use crate::{net::FeedForwardNetwork, pos::{Position, Action}};
 
 pub fn find_best_move(net: &mut FeedForwardNetwork, pos: &Position) -> ((usize, usize, usize), Vec<Action>) {
