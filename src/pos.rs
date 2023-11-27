@@ -13,7 +13,7 @@ use std::{
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 22;
 
-type Board = [[usize; BOARD_WIDTH]; BOARD_HEIGHT];
+type Board<T> = [[T; BOARD_WIDTH]; BOARD_HEIGHT];
 type Piece = Vec<Vec<usize>>;
 
 lazy_static! {
@@ -152,8 +152,14 @@ lazy_static! {
     };
 }
 
+trait Cell {
+    fn is_empty(&self) -> bool;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum PieceKind {
+    Empty,
     I,
     O,
     J,
@@ -161,6 +167,25 @@ pub enum PieceKind {
     S,
     T,
     Z,
+}
+
+impl Cell for PieceKind {
+    fn is_empty(&self) -> bool {
+        *self == PieceKind::Empty
+    }
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum Mask {
+    Unset,
+    Set,
+}
+
+impl Cell for Mask {
+    fn is_empty(&self) -> bool {
+        *self == Mask::Unset
+    }
 }
 
 // TODO: custom error type
@@ -194,6 +219,7 @@ impl fmt::Display for PieceKind {
                 PieceKind::S => 'S',
                 PieceKind::T => 'T',
                 PieceKind::Z => 'Z',
+                _ => ' ',
             }
         )?;
 
@@ -272,7 +298,7 @@ pub struct Position {
     pub score: i64,
     pub current_piece: usize,
     pub next_piece: usize,
-    pub board: Board,
+    pub board: Board<PieceKind>,
     pub hash: u64,
 }
 
@@ -281,7 +307,7 @@ impl Position {
         current_piece: usize,
         next_piece: usize,
         score: i64,
-        board: Board,
+        board: Board<PieceKind>,
         hash: u64,
     ) -> Self {
         Position {
@@ -413,7 +439,7 @@ impl Position {
 
     fn pathfind_open_air(
         &self,
-        open_air_mask: &Board,
+        open_air_mask: &Board<Mask>,
         piece_idx: usize,
         x: i32,
         y: i32,
@@ -480,14 +506,14 @@ impl Position {
 
     pub fn legal_moves(&self) -> Vec<(usize, usize, usize)> {
         let mut legal_moves = Vec::new();
-        let mut open_air_mask = [[1; BOARD_WIDTH]; BOARD_HEIGHT];
+        let mut open_air_mask = [[Mask::Set; BOARD_WIDTH]; BOARD_HEIGHT];
         let mut cache = FxHashSet::default();
 
         for x in 0..BOARD_WIDTH {
             let mut y = 0;
 
-            while y < BOARD_HEIGHT && self.board[y][x] == 0 {
-                open_air_mask[y][x] = 0;
+            while y < BOARD_HEIGHT && self.board[y][x].is_empty() {
+                open_air_mask[y][x] = Mask::Unset;
                 y += 1;
             }
         }
@@ -536,16 +562,16 @@ impl Position {
 
         for y in (1..BOARD_HEIGHT).rev() {
             for x in 0..BOARD_WIDTH {
-                if self.board[y][x] != 0 {
+                if self.board[y][x] != PieceKind::Empty {
                     heights[x] = (BOARD_HEIGHT - y) as f64;
                 }
 
-                if self.board[y - 1][x] != 0 && self.board[y][x] == 0 {
+                if self.board[y - 1][x] != PieceKind::Empty && self.board[y][x] == PieceKind::Empty {
                     holes += 1;
 
                     let mut l = 1;
 
-                    while y + l < BOARD_HEIGHT && self.board[y + l][x] == 0 {
+                    while y + l < BOARD_HEIGHT && self.board[y + l][x].is_empty() {
                         holes += 1;
                         l += 1;
                     }
@@ -595,10 +621,10 @@ impl Position {
         // Place the piece
         for i in 0..size_x {
             for j in 0..size_y {
-                if new_board[y + j][x + i] == 0 && piece[j][i] != 0 {
-                    let piece_type = piece[j][i];
+                if new_board[y + j][x + i].is_empty() && piece[j][i] != 0 {
+                    let piece_type = PieceKind::try_from(temp_piece_into(piece[j][i])).unwrap();
                     new_board[y + j][x + i] = piece_type;
-                    new_hash ^= ZOBRISTS[y + j][x + i][piece_type - 1];
+                    new_hash ^= ZOBRISTS[y + j][x + i][piece_type as usize - 1];
                 }
             }
         }
@@ -606,7 +632,7 @@ impl Position {
         // Update lines
         let mut line_count = 0;
         for j in 0..BOARD_HEIGHT {
-            let full_line = new_board[j].iter().all(|&cell| cell != 0);
+            let full_line = new_board[j].iter().all(|&cell| !cell.is_empty());
 
             if full_line {
                 let new_board_copy = new_board.clone();
@@ -616,12 +642,12 @@ impl Position {
                         let piece_type = self.board[y][x];
                         let old_piece_type = self.board[y + 1][x];
 
-                        if old_piece_type != 0 {
-                            new_hash ^= ZOBRISTS[y + 1][x][old_piece_type - 1];
+                        if old_piece_type != PieceKind::Empty {
+                            new_hash ^= ZOBRISTS[y + 1][x][old_piece_type as usize - 1];
                         }
 
-                        if piece_type != 0 {
-                            new_hash ^= ZOBRISTS[y + 1][x][piece_type - 1];
+                        if piece_type != PieceKind::Empty {
+                            new_hash ^= ZOBRISTS[y + 1][x][piece_type as usize - 1];
                         }
 
                         new_board[y + 1][x] = new_board_copy[y][x];
@@ -644,7 +670,7 @@ impl Position {
 
         // Check game over
         for i in 0..BOARD_WIDTH {
-            if new_board[0][i] != 0 || new_board[1][i] != 0 {
+            if !new_board[0][i].is_empty() || !new_board[1][i].is_empty() {
                 return None;
             }
         }
@@ -666,7 +692,7 @@ impl Position {
 impl Default for Position {
     fn default() -> Self {
         let current_piece = Position::gen_piece(0);
-        let board = [[0; BOARD_WIDTH]; BOARD_HEIGHT];
+        let board = [[PieceKind::Empty; BOARD_WIDTH]; BOARD_HEIGHT];
 
         Self {
             current_piece: Position::gen_piece(0),
@@ -683,13 +709,13 @@ impl fmt::Display for Position {
         let mut empty_cells = 0;
         for y in 0..BOARD_HEIGHT {
             for x in 0..BOARD_WIDTH {
-                if self.board[y][x] != 0 && empty_cells > 0 && empty_cells < 10 {
+                if self.board[y][x] != PieceKind::Empty && empty_cells > 0 && empty_cells < 10 {
                     write!(f, "{}", empty_cells)?;
                     empty_cells = 0;
                 }
 
-                if self.board[y][x] != 0 {
-                    write!(f, "{}", temp_piece_into(self.board[y][x]))?;
+                if self.board[y][x] != PieceKind::Empty {
+                    write!(f, "{}", self.board[y][x])?;
                 } else {
                     empty_cells += 1;
                 }
@@ -701,7 +727,6 @@ impl fmt::Display for Position {
 
             write!(f, "/")?;
             empty_cells = 0;
-
         }
 
         write!(
@@ -721,7 +746,7 @@ impl FromStr for Position {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut board = [[0; BOARD_WIDTH]; BOARD_HEIGHT];
+        let mut board = [[PieceKind::Empty; BOARD_WIDTH]; BOARD_HEIGHT];
         let mut curr_x = 0;
         let mut curr_y = 0;
 
@@ -746,7 +771,7 @@ impl FromStr for Position {
                 }
                 _ => {
                     let piece = PieceKind::try_from(x)?;
-                    board[curr_y][curr_x] = piece as usize;
+                    board[curr_y][curr_x] = piece;
                     curr_x += 1;
                 }
             }
@@ -761,7 +786,7 @@ impl FromStr for Position {
     }
 }
 
-fn check_colision(board: &Board, piece: &Piece, x: i32, y: i32) -> bool {
+fn check_colision<T: Cell>(board: &Board<T>, piece: &Piece, x: i32, y: i32) -> bool {
     let size_x = piece[0].len() as i32;
     let size_y = piece.len() as i32;
 
@@ -771,7 +796,8 @@ fn check_colision(board: &Board, piece: &Piece, x: i32, y: i32) -> bool {
 
     for i in 0..size_x {
         for j in 0..size_y {
-            if board[(y + j) as usize][(x + i) as usize] != 0 && piece[j as usize][i as usize] != 0
+            if !board[(y + j) as usize][(x + i) as usize].is_empty()
+                && piece[j as usize][i as usize] != 0
             {
                 return true;
             }
@@ -789,7 +815,7 @@ fn proximity(a: (i32, i32, i32), b: (i32, i32, i32), rot_dim: i32) -> i32 {
     (a.0 - b.0).abs() + cmp::min(wrap_rot(a.2 - b.2, rot_dim), wrap_rot(b.2 - a.2, rot_dim))
 }
 
-fn hash_board(board: &Board) -> u64 {
+fn hash_board(board: &Board<PieceKind>) -> u64 {
     let mut hash = 0;
 
     for x in 0..BOARD_WIDTH {
