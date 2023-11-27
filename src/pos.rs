@@ -12,14 +12,42 @@ use std::{
 
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 22;
+const PIECE_NUMBER: usize = 7;
 
 type Board<T> = [[T; BOARD_WIDTH]; BOARD_HEIGHT];
-type Piece = Vec<Vec<usize>>;
+type Piece = Vec<Vec<Color>>;
+
+macro_rules! piece {
+    ($color:expr, $( $vec:expr ),* ) => {
+        {
+            let mut result = Vec::new();
+
+            $(
+                let mut new_piece = Vec::new();
+                for row in $vec.iter() {
+                    let mut new_row = Vec::new();
+                    for cell in row.iter() {
+                        match cell {
+                            0 => new_row.push(Color::Empty),
+                            1 => new_row.push($color),
+                            _ => panic!("Invalid value in the input vector"),
+                        }
+                    }
+                    new_piece.push(new_row);
+                }
+                result.push(new_piece);
+            )*
+
+            result
+        }
+    };
+}
 
 lazy_static! {
     #[rustfmt::skip]
-    static ref PIECES: Vec<Vec<Piece>> = vec![
-        vec![
+    static ref PIECES: [Vec<Piece>; PIECE_NUMBER] = [
+        piece!(
+            Color::I,
             vec![
                 vec![1, 1, 1, 1]
             ],
@@ -28,96 +56,102 @@ lazy_static! {
                 vec![1],
                 vec![1],
                 vec![1],
-            ],
-        ],
-        vec![
-            vec![
-                vec![2, 2],
-                vec![2, 2]
             ]
-        ],
-        vec![
+        ),
+        piece!(
+            Color::O,
             vec![
-                vec![3, 3, 3],
-                vec![0, 0, 3],
+                vec![1, 1],
+                vec![1, 1]
+            ]
+        ),
+        piece!(
+            Color::J,
+            vec![
+                vec![1, 1, 1],
+                vec![0, 0, 1],
             ],
             vec![
-                vec![0, 3],
-                vec![0, 3],
-                vec![3, 3],
+                vec![0, 1],
+                vec![0, 1],
+                vec![1, 1],
             ],
             vec![
-                vec![3, 0, 0],
-                vec![3, 3, 3],
+                vec![1, 0, 0],
+                vec![1, 1, 1],
             ],
             vec![
-                vec![3, 3],
-                vec![3, 0],
-                vec![3, 0],
-            ],
-        ],
-        vec![
+                vec![1, 1],
+                vec![1, 0],
+                vec![1, 0],
+            ]
+        ),
+        piece!(
+            Color::L,
             vec![
-                vec![4, 4, 4],
-                vec![4, 0, 0],
-            ],
-            vec![
-                vec![4, 4],
-                vec![0, 4],
-                vec![0, 4],
+                vec![1, 1, 1],
+                vec![1, 0, 0],
             ],
             vec![
-                vec![0, 0, 4],
-                vec![4, 4, 4],
+                vec![1, 1],
+                vec![0, 1],
+                vec![0, 1],
             ],
             vec![
-                vec![4, 0],
-                vec![4, 0],
-                vec![4, 4],
-            ],
-        ],
-        vec![
-            vec![
-                vec![0, 5, 5],
-                vec![5, 5, 0],
+                vec![0, 0, 1],
+                vec![1, 1, 1],
             ],
             vec![
-                vec![5, 0],
-                vec![5, 5],
-                vec![0, 5],
-            ],
-        ],
-        vec![
+                vec![1, 0],
+                vec![1, 0],
+                vec![1, 1],
+            ]
+        ),
+        piece!(
+            Color::S,
             vec![
-                vec![6, 6, 6],
-                vec![0, 6, 0],
-            ],
-            vec![
-                vec![0, 6],
-                vec![6, 6],
-                vec![0, 6],
+                vec![0, 1, 1],
+                vec![1, 1, 0],
             ],
             vec![
-                vec![0, 6, 0],
-                vec![6, 6, 6],
+                vec![1, 0],
+                vec![1, 1],
+                vec![0, 1],
+            ]
+        ),
+        piece!(
+            Color::T,
+            vec![
+                vec![1, 1, 1],
+                vec![0, 1, 0],
             ],
             vec![
-                vec![6, 0],
-                vec![6, 6],
-                vec![6, 0],
-            ],
-        ],
-        vec![
-            vec![
-                vec![7, 7, 0],
-                vec![0, 7, 7],
+                vec![0, 1],
+                vec![1, 1],
+                vec![0, 1],
             ],
             vec![
-                vec![0, 7],
-                vec![7, 7],
-                vec![7, 0],
+                vec![0, 1, 0],
+                vec![1, 1, 1],
             ],
-        ],
+            vec![
+                vec![1, 0],
+                vec![1, 1],
+                vec![1, 0],
+            ]
+        ),
+        piece!(
+            Color::Z,
+            vec![
+                vec![1, 1, 0],
+                vec![0, 1, 1],
+            ],
+            vec![
+                vec![0, 1],
+                vec![1, 1],
+                vec![1, 0],
+            ]
+        ),
     ];
 
     static ref ROTATION_OFFSETS: Vec<Vec<(i32, i32)>> = vec![
@@ -158,7 +192,7 @@ trait Cell {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
-pub enum PieceKind {
+pub enum Color {
     Empty,
     I,
     O,
@@ -169,9 +203,9 @@ pub enum PieceKind {
     Z,
 }
 
-impl Cell for PieceKind {
+impl Cell for Color {
     fn is_empty(&self) -> bool {
-        *self == PieceKind::Empty
+        *self == Color::Empty
     }
 }
 
@@ -189,36 +223,36 @@ impl Cell for Mask {
 }
 
 // TODO: custom error type
-impl TryFrom<char> for PieceKind {
+impl TryFrom<char> for Color {
     type Error = ();
 
     fn try_from(value: char) -> Result<Self, Self::Error> {
         match value {
-            'I' => Ok(PieceKind::I),
-            'O' => Ok(PieceKind::O),
-            'J' => Ok(PieceKind::J),
-            'L' => Ok(PieceKind::L),
-            'S' => Ok(PieceKind::S),
-            'T' => Ok(PieceKind::T),
-            'Z' => Ok(PieceKind::Z),
+            'I' => Ok(Color::I),
+            'O' => Ok(Color::O),
+            'J' => Ok(Color::J),
+            'L' => Ok(Color::L),
+            'S' => Ok(Color::S),
+            'T' => Ok(Color::T),
+            'Z' => Ok(Color::Z),
             _ => Err(()),
         }
     }
 }
 
-impl fmt::Display for PieceKind {
+impl fmt::Display for Color {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}",
             match self {
-                PieceKind::I => 'I',
-                PieceKind::O => 'O',
-                PieceKind::J => 'J',
-                PieceKind::L => 'L',
-                PieceKind::S => 'S',
-                PieceKind::T => 'T',
-                PieceKind::Z => 'Z',
+                Color::I => 'I',
+                Color::O => 'O',
+                Color::J => 'J',
+                Color::L => 'L',
+                Color::S => 'S',
+                Color::T => 'T',
+                Color::Z => 'Z',
                 _ => ' ',
             }
         )?;
@@ -298,7 +332,7 @@ pub struct Position {
     pub score: i64,
     pub current_piece: usize,
     pub next_piece: usize,
-    pub board: Board<PieceKind>,
+    pub board: Board<Color>,
     pub hash: u64,
 }
 
@@ -307,7 +341,7 @@ impl Position {
         current_piece: usize,
         next_piece: usize,
         score: i64,
-        board: Board<PieceKind>,
+        board: Board<Color>,
         hash: u64,
     ) -> Self {
         Position {
@@ -552,21 +586,18 @@ impl Position {
         legal_moves
     }
 
-    pub fn hash(&self) -> u64 {
-        self.hash
-    }
-
     pub fn features(&self) -> Features {
         let mut holes = 0;
         let mut heights: [f64; BOARD_WIDTH] = [0.; BOARD_WIDTH];
 
         for y in (1..BOARD_HEIGHT).rev() {
             for x in 0..BOARD_WIDTH {
-                if self.board[y][x] != PieceKind::Empty {
+                if !self.board[y][x].is_empty() {
                     heights[x] = (BOARD_HEIGHT - y) as f64;
                 }
 
-                if self.board[y - 1][x] != PieceKind::Empty && self.board[y][x] == PieceKind::Empty {
+                if !self.board[y - 1][x].is_empty() && self.board[y][x].is_empty()
+                {
                     holes += 1;
 
                     let mut l = 1;
@@ -621,8 +652,8 @@ impl Position {
         // Place the piece
         for i in 0..size_x {
             for j in 0..size_y {
-                if new_board[y + j][x + i].is_empty() && piece[j][i] != 0 {
-                    let piece_type = PieceKind::try_from(temp_piece_into(piece[j][i])).unwrap();
+                if new_board[y + j][x + i].is_empty() && !piece[j][i].is_empty() {
+                    let piece_type = piece[j][i];
                     new_board[y + j][x + i] = piece_type;
                     new_hash ^= ZOBRISTS[y + j][x + i][piece_type as usize - 1];
                 }
@@ -642,11 +673,11 @@ impl Position {
                         let piece_type = self.board[y][x];
                         let old_piece_type = self.board[y + 1][x];
 
-                        if old_piece_type != PieceKind::Empty {
+                        if !old_piece_type.is_empty() {
                             new_hash ^= ZOBRISTS[y + 1][x][old_piece_type as usize - 1];
                         }
 
-                        if piece_type != PieceKind::Empty {
+                        if !piece_type.is_empty() {
                             new_hash ^= ZOBRISTS[y + 1][x][piece_type as usize - 1];
                         }
 
@@ -692,7 +723,7 @@ impl Position {
 impl Default for Position {
     fn default() -> Self {
         let current_piece = Position::gen_piece(0);
-        let board = [[PieceKind::Empty; BOARD_WIDTH]; BOARD_HEIGHT];
+        let board = [[Color::Empty; BOARD_WIDTH]; BOARD_HEIGHT];
 
         Self {
             current_piece: Position::gen_piece(0),
@@ -709,12 +740,12 @@ impl fmt::Display for Position {
         let mut empty_cells = 0;
         for y in 0..BOARD_HEIGHT {
             for x in 0..BOARD_WIDTH {
-                if self.board[y][x] != PieceKind::Empty && empty_cells > 0 && empty_cells < 10 {
+                if !self.board[y][x].is_empty() && empty_cells > 0 && empty_cells < 10 {
                     write!(f, "{}", empty_cells)?;
                     empty_cells = 0;
                 }
 
-                if self.board[y][x] != PieceKind::Empty {
+                if !self.board[y][x].is_empty() {
                     write!(f, "{}", self.board[y][x])?;
                 } else {
                     empty_cells += 1;
@@ -746,7 +777,7 @@ impl FromStr for Position {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut board = [[PieceKind::Empty; BOARD_WIDTH]; BOARD_HEIGHT];
+        let mut board = [[Color::Empty; BOARD_WIDTH]; BOARD_HEIGHT];
         let mut curr_x = 0;
         let mut curr_y = 0;
 
@@ -770,16 +801,16 @@ impl FromStr for Position {
                     curr_x += (x as usize) - ('0' as usize)
                 }
                 _ => {
-                    let piece = PieceKind::try_from(x)?;
+                    let piece = Color::try_from(x)?;
                     board[curr_y][curr_x] = piece;
                     curr_x += 1;
                 }
             }
         }
 
-        let current_piece = PieceKind::try_from(curr_piece_tok.chars().next().ok_or(())?)? as usize;
-        let next_piece = PieceKind::try_from(next_piece_tok.chars().next().ok_or(())?)? as usize;
-        let score = i64::from_str(score_tok).map_err(|e| ())?;
+        let current_piece = Color::try_from(curr_piece_tok.chars().next().ok_or(())?)? as usize;
+        let next_piece = Color::try_from(next_piece_tok.chars().next().ok_or(())?)? as usize;
+        let score = i64::from_str(score_tok).map_err(|_| ())?;
 
         let hash = hash_board(&board);
         Ok(Position::new(current_piece, next_piece, score, board, hash))
@@ -797,7 +828,7 @@ fn check_colision<T: Cell>(board: &Board<T>, piece: &Piece, x: i32, y: i32) -> b
     for i in 0..size_x {
         for j in 0..size_y {
             if !board[(y + j) as usize][(x + i) as usize].is_empty()
-                && piece[j as usize][i as usize] != 0
+                && !piece[j as usize][i as usize].is_empty()
             {
                 return true;
             }
@@ -815,7 +846,7 @@ fn proximity(a: (i32, i32, i32), b: (i32, i32, i32), rot_dim: i32) -> i32 {
     (a.0 - b.0).abs() + cmp::min(wrap_rot(a.2 - b.2, rot_dim), wrap_rot(b.2 - a.2, rot_dim))
 }
 
-fn hash_board(board: &Board<PieceKind>) -> u64 {
+fn hash_board(board: &Board<Color>) -> u64 {
     let mut hash = 0;
 
     for x in 0..BOARD_WIDTH {
