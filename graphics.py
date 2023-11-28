@@ -140,14 +140,14 @@ class Graphic():
         pg.display.set_caption('NEAT Tetris')
         self.font = pg.font.SysFont("CMU Serif Roman", int(self.block_width*0.7))
         self.ID_2_RGB = {
-            1 : (56, 196, 79),
-            2 : (50, 164, 250),
-            3 : (255, 172, 28),
-            4 : (255, 102, 0),
-            5 : (204, 84, 196),
-            6 : (153, 153, 153),
-            7 : (255, 0, 0)}
-
+            1 : (49, 199, 239),
+            2 : (247, 211, 8),
+            3 : (90, 101, 173),
+            4 : (239, 121, 33),
+            5 : (66, 182, 66),
+            6 : (173, 77, 156),
+            7 : (239, 32, 41)
+        }
 
     def fill_gradient(self, surface, color, gradient, rect=None, vertical=True, forward=True):
         """fill a surface with a gradient pattern
