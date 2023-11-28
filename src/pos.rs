@@ -189,6 +189,7 @@ pub trait Cell {
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum Color {
+    Empty,
     I,
     O,
     J,
@@ -196,20 +197,20 @@ pub enum Color {
     S,
     T,
     Z,
-    Empty,
     Random,
 }
 
 impl From<u8> for Color {
     fn from(value: u8) -> Self {
         match value {
-            0 => Color::I,
-            1 => Color::O,
-            2 => Color::J,
-            3 => Color::L,
-            4 => Color::S,
-            5 => Color::T,
-            6 => Color::Z,
+            0 => Color::Empty,
+            1 => Color::I,
+            2 => Color::O,
+            3 => Color::J,
+            4 => Color::L,
+            5 => Color::S,
+            6 => Color::T,
+            7 => Color::Z,
             _ => Color::Empty,
         }
     }
@@ -359,11 +360,11 @@ impl Position {
     }
 
     pub fn path(&self, goal: (i32, i32, i32)) -> Vec<Action> {
-        let rot_num = ROTATION_OFFSETS[self.current_piece as usize].len() as i32;
+        let rot_num = ROTATION_OFFSETS[self.current_piece as usize - 1].len() as i32;
 
         let mut goal_mv = None;
 
-        let start = SPAWNS[self.current_piece as usize];
+        let start = SPAWNS[self.current_piece as usize - 1];
         let start_move = OrderedMove::new(Move::new(Action::None, start), 0);
 
         let mut frontier = BinaryHeap::new();
@@ -383,8 +384,8 @@ impl Position {
                 break;
             }
 
-            let mut piece =
-                &PIECES[self.current_piece as usize][wrap_rot(current.dest.2, rot_num) as usize];
+            let mut piece = &PIECES[self.current_piece as usize - 1]
+                [wrap_rot(current.dest.2, rot_num) as usize];
 
             let mut move_list: ArrayVec<Move, 5> = ArrayVec::new();
 
@@ -401,9 +402,9 @@ impl Position {
             }
 
             let mut rot = wrap_rot(dest.2 - 1, rot_num) as usize;
-            let mut rot_offset = ROTATION_OFFSETS[self.current_piece as usize][rot];
+            let mut rot_offset = ROTATION_OFFSETS[self.current_piece as usize - 1][rot];
 
-            piece = &PIECES[self.current_piece as usize][rot];
+            piece = &PIECES[self.current_piece as usize - 1][rot];
 
             if !check_collision(
                 &self.board,
@@ -422,8 +423,8 @@ impl Position {
             }
 
             rot = wrap_rot(dest.2, rot_num) as usize;
-            rot_offset = ROTATION_OFFSETS[self.current_piece as usize][rot];
-            piece = &PIECES[self.current_piece as usize][rot];
+            rot_offset = ROTATION_OFFSETS[self.current_piece as usize - 1][rot];
+            piece = &PIECES[self.current_piece as usize - 1][rot];
 
             if !check_collision(
                 &self.board,
@@ -513,7 +514,7 @@ impl Position {
             return true;
         }
 
-        let rot_num = *&ROTATION_OFFSETS[piece_idx].len() as i32;
+        let rot_num = ROTATION_OFFSETS[piece_idx].len() as i32;
         let mut rot_offset = ROTATION_OFFSETS[piece_idx][wrap_rot(rot - 1, rot_num) as usize];
 
         if self.pathfind_open_air(
@@ -563,20 +564,19 @@ impl Position {
         };
 
         for piece_color in piece_list {
-            let piece_kind = &PIECES[piece_color as usize];
+            let piece_kind = &PIECES[piece_color as usize - 1];
             let mut piece_legal_moves = Vec::new();
 
             for (rot, piece) in piece_kind.iter().enumerate() {
                 let size_x = piece[0].len();
                 let size_y = piece.len();
-                for y in 0..(BOARD_HEIGHT - size_y + 1) {
-                    for x in 0..(BOARD_WIDTH - size_x + 1) {
-                        if is_lock_fast(&self.board, piece, x, y, size_x, size_y)
-                        {
+                for x in 0..(BOARD_WIDTH - size_x + 1) {
+                    for y in (0..(BOARD_HEIGHT - size_y + 1)).rev() {
+                        if is_lock_fast(&self.board, piece, x, y, size_x, size_y) {
                             if check_collision(&open_air_mask, piece, x as i32, y as i32) {
                                 if self.pathfind_open_air(
                                     &open_air_mask,
-                                    piece_color as usize,
+                                    piece_color as usize - 1,
                                     x as i32,
                                     y as i32,
                                     rot as i32,
@@ -589,6 +589,8 @@ impl Position {
                             } else {
                                 piece_legal_moves.push((piece_color, x, y, rot));
                             }
+                        } else if !check_collision(&open_air_mask, piece, x as i32, y as i32) {
+                            break;
                         }
                     }
                 }
@@ -645,7 +647,7 @@ impl Position {
         rot: usize,
         gen_next: bool,
     ) -> Option<Position> {
-        let piece = &PIECES[piece_color as usize][rot];
+        let piece = &PIECES[piece_color as usize - 1][rot];
         let size_x = piece[0].len();
         let size_y = piece.len();
 
@@ -724,7 +726,7 @@ impl Position {
         let mut res = ArrayVec::new();
 
         if exclusive {
-            for color_idx in 0..PIECE_NUMBER as u8 {
+            for color_idx in 1..=PIECE_NUMBER as u8 {
                 if color_idx != self.last_piece as u8 {
                     res.push(Color::from(color_idx));
                 }
@@ -755,10 +757,10 @@ impl Default for Position {
 
 impl Distribution<Color> for Position {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Color {
-        let next_piece = rng.gen_range(0..7);
+        let next_piece = rng.gen_range(1..8);
 
         if next_piece == self.next_piece as u8 {
-            let reroll = rng.gen_range(0..6);
+            let reroll = rng.gen_range(1..7);
 
             if reroll < next_piece {
                 Color::from(reroll)
@@ -879,15 +881,15 @@ fn check_collision<T: Cell>(board: &Board<T>, piece: &Piece, x: i32, y: i32) -> 
     false
 }
 
-fn is_lock_fast<T: Cell>(
-    board: &Board<T>,
+fn is_lock_fast(
+    board: &Board<Color>,
     piece: &Piece,
     x: usize,
     y: usize,
     size_x: usize,
     size_y: usize,
 ) -> bool {
-    if y >= BOARD_HEIGHT - size_y - 1 {
+    if y == BOARD_HEIGHT - size_y {
         return true;
     }
 
@@ -895,10 +897,10 @@ fn is_lock_fast<T: Cell>(
 
     for j in (0..size_y).rev() {
         for i in 0..size_x {
-            if !piece[j as usize][i as usize].is_empty() {
-                if !board[(y + j) as usize][(x + i) as usize].is_empty() {
+            if piece[j as usize][i as usize] as u8 != 0 {
+                if board[(y + j) as usize][(x + i) as usize] as u8 != 0 {
                     return false;
-                } else if !board[(y + j + 1) as usize][(x + i) as usize].is_empty() {
+                } else if board[(y + j + 1) as usize][(x + i) as usize] as u8 != 0 {
                     is_lock = true;
                 }
             }

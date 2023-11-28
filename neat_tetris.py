@@ -134,7 +134,7 @@ if __name__ == "__main__":
 
         board = np.array(pos.board)
 
-        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (255, 255, 255), board, 100)
+        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (211,211,211), board, 100)
         while True:
             move = play_engine.go()
 
