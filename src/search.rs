@@ -4,25 +4,47 @@ use crate::{
     transposition::TranspositionTable,
 };
 
+const MAX_DEPTH: usize = 3;
+
 pub struct Search {
     tt: TranspositionTable,
 }
 
 impl Search {
     pub fn new() -> Search {
-        Search { tt: TranspositionTable::new(16384) }
+        Search {
+            tt: TranspositionTable::new(16384),
+        }
     }
-    pub fn find_best_move(
+
+    pub fn run(
         &mut self,
         net: &mut FeedForwardNetwork,
         pos: &Position,
     ) -> ((usize, usize, usize), Vec<Action>) {
+        let mut best_move = (0, 0, 0);
+        for depth in 2..4 {
+            best_move = self.search_root(net, depth, pos);
+        }
+
+        (
+            best_move,
+            pos.path((best_move.0 as i32, best_move.1 as i32, best_move.2 as i32)),
+        )
+    }
+
+    fn search_root(
+        &mut self,
+        net: &mut FeedForwardNetwork,
+        depth: usize,
+        pos: &Position,
+    ) -> (usize, usize, usize) {
         let mut maxscore = -f64::INFINITY;
         let mut best_move = (0, 0, 0);
 
-        for &(x, y, rot) in pos.legal_moves().iter() {
-            if let Some(pos) = pos.apply_move(x, y, rot, false) {
-                let score = self.search(net, pos, 1);
+        for &(p, x, y, rot) in pos.legal_moves()[0].iter() {
+            if let Some(pos) = pos.apply_move(p, x, y, rot, false) {
+                let score = self.search(net, pos, depth - 1);
 
                 if score > maxscore {
                     maxscore = score;
@@ -31,42 +53,48 @@ impl Search {
             }
         }
 
-        let test = (best_move.0 as i32, best_move.1 as i32, best_move.2 as i32);
-
-        (best_move, pos.path(test))
+        best_move
     }
 
     fn search(&mut self, net: &mut FeedForwardNetwork, pos: Position, depth: usize) -> f64 {
         if depth == 0 {
             if let Some(score) = self.tt.get(pos.hash) {
-                return score
+                return score;
             } else {
                 let features = pos.features();
 
-                let score = net.activate(vec![
-                    0.,
-                    features.holes,
-                    features.bumpiness,
-                    features.aggregate_height,
-                ])[0];
+                let score = features.aggregate_height * -0.510066
+                    + features.holes * -0.35663
+                    + features.bumpiness * -0.184483;
+
+                // let score = net.activate(vec![
+                //     0.,
+                //     features.holes,
+                //     features.bumpiness,
+                //     features.aggregate_height,
+                // ])[0];
 
                 self.tt.set(pos.hash, score);
 
                 return score;
             }
-
         }
 
-        let mut maxscore = -f64::INFINITY;
+        let mut maxscore = 0.;
+        let piece_list = pos.legal_moves();
+        let piece_list_len = piece_list.len() as f64;
+        for piece_moves in piece_list {
+            let mut piece_maxscore = -f64::INFINITY;
+            for (p, x, y, rot) in piece_moves {
+                if let Some(pos) = pos.apply_move(p, x, y, rot, false) {
+                    let score = self.search(net, pos, depth - 1);
 
-        for &(x, y, rot) in pos.legal_moves().iter() {
-            if let Some(pos) = pos.apply_move(x, y, rot, false) {
-                let score = self.search(net, pos, depth - 1);
-
-                if score > maxscore {
-                    maxscore = score;
+                    if score > piece_maxscore {
+                        piece_maxscore = score;
+                    }
                 }
             }
+            maxscore += piece_maxscore / piece_list_len;
         }
 
         maxscore

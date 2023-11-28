@@ -77,8 +77,10 @@ pub fn start() -> io::Result<()> {
             In::Go => {
                 if let Some(nn) = &mut net {
                     let start = Instant::now();
-                    let (best, action_list) = search.find_best_move(nn, &pos);
-                    pos = pos.apply_move(best.0, best.1, best.2, true).unwrap();
+                    let (best, action_list) = search.run(nn, &pos);
+                    pos = pos
+                        .apply_move(pos.current_piece, best.0, best.1, best.2, true)
+                        .unwrap();
                     let end = Instant::now();
                     eprintln!("Thinking time: {}", (end - start).as_millis());
                     send(&Out::Move { action_list })?;
@@ -94,11 +96,13 @@ pub fn start() -> io::Result<()> {
             }
             In::PlayGame => {
                 if let Some(nn) = &mut net {
-                    let (mut best, _) = search.find_best_move(nn, &pos);
-                    while let Some(new_pos) = pos.apply_move(best.0, best.1, best.2, true) {
+                    let (mut best, _) = search.run(nn, &pos);
+                    while let Some(new_pos) =
+                        pos.apply_move(pos.current_piece, best.0, best.1, best.2, true)
+                    {
                         if total_moves <= 500 {
                             pos = new_pos;
-                            best = search.find_best_move(nn, &pos).0;
+                            best = search.run(nn, &pos).0;
                             total_moves += 1;
                         } else {
                             break;

@@ -1,10 +1,6 @@
 use arrayvec::ArrayVec;
 use lazy_static::lazy_static;
-use rand::{
-    distributions::Distribution,
-    Rng,
-    rngs::SmallRng, SeedableRng,
-};
+use rand::{distributions::Distribution, rngs::SmallRng, Rng, SeedableRng};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Serialize;
 use std::{
@@ -186,7 +182,7 @@ lazy_static! {
     };
 }
 
-trait Cell {
+pub trait Cell {
     fn is_empty(&self) -> bool;
 }
 
@@ -201,6 +197,7 @@ pub enum Color {
     T,
     Z,
     Empty,
+    Random,
 }
 
 impl From<u8> for Color {
@@ -219,6 +216,7 @@ impl From<u8> for Color {
 }
 
 impl Cell for Color {
+    #[inline]
     fn is_empty(&self) -> bool {
         *self == Color::Empty
     }
@@ -250,6 +248,7 @@ impl TryFrom<char> for Color {
             'S' => Ok(Color::S),
             'T' => Ok(Color::T),
             'Z' => Ok(Color::Z),
+            '?' => Ok(Color::Random),
             _ => Err(()),
         }
     }
@@ -268,6 +267,7 @@ impl fmt::Display for Color {
                 Color::S => 'S',
                 Color::T => 'T',
                 Color::Z => 'Z',
+                Color::Random => '?',
                 _ => ' ',
             }
         )?;
@@ -332,6 +332,7 @@ impl PartialOrd for OrderedMove {
 #[derive(Debug)]
 pub struct Position {
     pub score: i64,
+    pub last_piece: Color,
     pub current_piece: Color,
     pub next_piece: Color,
     pub board: Board<Color>,
@@ -340,6 +341,7 @@ pub struct Position {
 
 impl Position {
     pub fn new(
+        last_piece: Color,
         current_piece: Color,
         next_piece: Color,
         score: i64,
@@ -347,6 +349,7 @@ impl Position {
         hash: u64,
     ) -> Self {
         Position {
+            last_piece,
             current_piece,
             next_piece,
             score,
@@ -385,15 +388,15 @@ impl Position {
 
             let mut move_list: ArrayVec<Move, 5> = ArrayVec::new();
 
-            if !check_colision(&self.board, piece, dest.0 - 1, dest.1) {
+            if !check_collision(&self.board, piece, dest.0 - 1, dest.1) {
                 move_list.push(Move::new(Action::MoveLeft, (dest.0 - 1, dest.1, dest.2)));
             }
 
-            if !check_colision(&self.board, piece, dest.0 + 1, dest.1) {
+            if !check_collision(&self.board, piece, dest.0 + 1, dest.1) {
                 move_list.push(Move::new(Action::MoveRight, (dest.0 + 1, dest.1, dest.2)));
             }
 
-            if !check_colision(&self.board, piece, dest.0, dest.1 + 1) {
+            if !check_collision(&self.board, piece, dest.0, dest.1 + 1) {
                 move_list.push(Move::new(Action::SoftDrop, (dest.0, dest.1 + 1, dest.2)));
             }
 
@@ -402,7 +405,7 @@ impl Position {
 
             piece = &PIECES[self.current_piece as usize][rot];
 
-            if !check_colision(
+            if !check_collision(
                 &self.board,
                 piece,
                 dest.0 - rot_offset.0,
@@ -422,7 +425,7 @@ impl Position {
             rot_offset = ROTATION_OFFSETS[self.current_piece as usize][rot];
             piece = &PIECES[self.current_piece as usize][rot];
 
-            if !check_colision(
+            if !check_collision(
                 &self.board,
                 piece,
                 dest.0 + rot_offset.0,
@@ -490,11 +493,11 @@ impl Position {
 
         let piece = &PIECES[piece_idx][rot as usize];
 
-        if check_colision(&self.board, piece, x, y) {
+        if check_collision(&self.board, piece, x, y) {
             return false;
         }
 
-        if !check_colision(open_air_mask, piece, x, y) {
+        if !check_collision(open_air_mask, piece, x, y) {
             return true;
         }
 
@@ -540,8 +543,8 @@ impl Position {
         false
     }
 
-    pub fn legal_moves(&self) -> Vec<(usize, usize, usize)> {
-        let mut legal_moves = Vec::new();
+    pub fn legal_moves(&self) -> ArrayVec<Vec<(Color, usize, usize, usize)>, 6> {
+        let mut legal_moves = ArrayVec::new();
         let mut open_air_mask = [[Mask::Set; BOARD_WIDTH]; BOARD_HEIGHT];
         let mut cache = FxHashSet::default();
 
@@ -554,35 +557,44 @@ impl Position {
             }
         }
 
-        let piece_kind = &PIECES[self.current_piece as usize];
+        let piece_list = match self.current_piece {
+            Color::Random => self.piece_array(true),
+            _ => self.piece_array(false),
+        };
 
-        for (rot, piece) in piece_kind.iter().enumerate() {
-            let size_x = piece[0].len();
-            let size_y = piece.len();
-            for x in 0..(BOARD_WIDTH - size_x + 1) {
+        for piece_color in piece_list {
+            let piece_kind = &PIECES[piece_color as usize];
+            let mut piece_legal_moves = Vec::new();
+
+            for (rot, piece) in piece_kind.iter().enumerate() {
+                let size_x = piece[0].len();
+                let size_y = piece.len();
                 for y in 0..(BOARD_HEIGHT - size_y + 1) {
-                    if !check_colision(&self.board, piece, x as i32, y as i32)
-                        && check_colision(&self.board, piece, x as i32, (y + 1) as i32)
-                    {
-                        if check_colision(&open_air_mask, piece, x as i32, y as i32) {
-                            if self.pathfind_open_air(
-                                &open_air_mask,
-                                self.current_piece as usize,
-                                x as i32,
-                                y as i32,
-                                rot as i32,
-                                &mut cache,
-                            ) {
-                                legal_moves.push((x, y, rot));
-                            }
+                    for x in 0..(BOARD_WIDTH - size_x + 1) {
+                        if is_lock_fast(&self.board, piece, x, y, size_x, size_y)
+                        {
+                            if check_collision(&open_air_mask, piece, x as i32, y as i32) {
+                                if self.pathfind_open_air(
+                                    &open_air_mask,
+                                    piece_color as usize,
+                                    x as i32,
+                                    y as i32,
+                                    rot as i32,
+                                    &mut cache,
+                                ) {
+                                    piece_legal_moves.push((piece_color, x, y, rot));
+                                }
 
-                            cache.clear();
-                        } else {
-                            legal_moves.push((x, y, rot));
+                                cache.clear();
+                            } else {
+                                piece_legal_moves.push((piece_color, x, y, rot));
+                            }
                         }
                     }
                 }
             }
+
+            legal_moves.push(piece_legal_moves)
         }
 
         legal_moves
@@ -625,8 +637,15 @@ impl Position {
         }
     }
 
-    pub fn apply_move(&self, x: usize, y: usize, rot: usize, gen_next: bool) -> Option<Position> {
-        let piece = &PIECES[self.current_piece as usize][rot];
+    pub fn apply_move(
+        &self,
+        piece_color: Color,
+        x: usize,
+        y: usize,
+        rot: usize,
+        gen_next: bool,
+    ) -> Option<Position> {
+        let piece = &PIECES[piece_color as usize][rot];
         let size_x = piece[0].len();
         let size_y = piece.len();
 
@@ -688,16 +707,33 @@ impl Position {
         }
 
         return Some(Position::new(
+            piece_color,
             self.next_piece,
             if gen_next {
                 self.sample(&mut rand::thread_rng())
             } else {
-                Color::Empty
+                Color::Random
             },
             new_score,
             new_board,
             new_hash,
         ));
+    }
+
+    pub fn piece_array(&self, exclusive: bool) -> ArrayVec<Color, 6> {
+        let mut res = ArrayVec::new();
+
+        if exclusive {
+            for color_idx in 0..PIECE_NUMBER as u8 {
+                if color_idx != self.last_piece as u8 {
+                    res.push(Color::from(color_idx));
+                }
+            }
+        } else {
+            res.push(self.current_piece);
+        }
+
+        res
     }
 }
 
@@ -707,6 +743,7 @@ impl Default for Position {
 
         // TODO: Fix random
         Self {
+            last_piece: Color::Empty,
             current_piece: Color::I,
             next_piece: Color::J,
             score: 0,
@@ -810,11 +847,18 @@ impl FromStr for Position {
         let score = i64::from_str(score_tok).map_err(|_| ())?;
 
         let hash = hash_board(&board);
-        Ok(Position::new(current_piece, next_piece, score, board, hash))
+        Ok(Position::new(
+            Color::Empty,
+            current_piece,
+            next_piece,
+            score,
+            board,
+            hash,
+        ))
     }
 }
 
-fn check_colision<T: Cell>(board: &Board<T>, piece: &Piece, x: i32, y: i32) -> bool {
+fn check_collision<T: Cell>(board: &Board<T>, piece: &Piece, x: i32, y: i32) -> bool {
     let size_x = piece[0].len() as i32;
     let size_y = piece.len() as i32;
 
@@ -833,6 +877,35 @@ fn check_colision<T: Cell>(board: &Board<T>, piece: &Piece, x: i32, y: i32) -> b
     }
 
     false
+}
+
+fn is_lock_fast<T: Cell>(
+    board: &Board<T>,
+    piece: &Piece,
+    x: usize,
+    y: usize,
+    size_x: usize,
+    size_y: usize,
+) -> bool {
+    if y >= BOARD_HEIGHT - size_y - 1 {
+        return true;
+    }
+
+    let mut is_lock = false;
+
+    for j in (0..size_y).rev() {
+        for i in 0..size_x {
+            if !piece[j as usize][i as usize].is_empty() {
+                if !board[(y + j) as usize][(x + i) as usize].is_empty() {
+                    return false;
+                } else if !board[(y + j + 1) as usize][(x + i) as usize].is_empty() {
+                    is_lock = true;
+                }
+            }
+        }
+    }
+
+    is_lock
 }
 
 fn wrap_rot(rot: i32, dim: i32) -> i32 {

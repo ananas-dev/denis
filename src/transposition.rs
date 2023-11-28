@@ -27,7 +27,6 @@ impl TranspositionTable {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
