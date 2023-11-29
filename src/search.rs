@@ -82,9 +82,9 @@ impl Search {
 
         let mut maxscore = 0.;
         let piece_list = pos.legal_moves();
-        let piece_list_len = piece_list.len() as f64;
         for piece_moves in piece_list {
             let mut piece_maxscore = -f64::INFINITY;
+            let piece_color = piece_moves[0].0;
             for (p, x, y, rot) in piece_moves {
                 if let Some(pos) = pos.apply_move(p, x, y, rot, false) {
                     let score = self.search(net, pos, depth - 1);
@@ -94,7 +94,14 @@ impl Search {
                     }
                 }
             }
-            maxscore += piece_maxscore / piece_list_len;
+
+            let prob = if pos.last_piece == piece_color {
+                3.57
+            } else {
+                16.07
+            };
+
+            maxscore += piece_maxscore / prob;
         }
 
         maxscore

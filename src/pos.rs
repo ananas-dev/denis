@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::{
     cmp::{self, Ordering},
     collections::BinaryHeap,
-    fmt,
+    fmt, iter,
     str::FromStr,
 };
 
@@ -42,6 +42,16 @@ macro_rules! piece {
         }
     };
 }
+
+const PIECE_ARRAY: [Color; 7] = [
+    Color::I,
+    Color::O,
+    Color::J,
+    Color::L,
+    Color::S,
+    Color::T,
+    Color::Z,
+];
 
 lazy_static! {
     #[rustfmt::skip]
@@ -544,7 +554,7 @@ impl Position {
         false
     }
 
-    pub fn legal_moves(&self) -> ArrayVec<Vec<(Color, usize, usize, usize)>, 6> {
+    pub fn legal_moves(&self) -> ArrayVec<Vec<(Color, usize, usize, usize)>, 7> {
         let mut legal_moves = ArrayVec::new();
         let mut open_air_mask = [[Mask::Set; BOARD_WIDTH]; BOARD_HEIGHT];
         let mut cache = FxHashSet::default();
@@ -558,9 +568,13 @@ impl Position {
             }
         }
 
-        let piece_list = match self.current_piece {
-            Color::Random => self.piece_array(true),
-            _ => self.piece_array(false),
+        // Weird but works for the time being
+        let piece_list = if self.current_piece == Color::Random {
+            ArrayVec::from(PIECE_ARRAY)
+        } else {
+            let mut vec = ArrayVec::new();
+            vec.push(self.current_piece);
+            vec
         };
 
         for piece_color in piece_list {
@@ -572,8 +586,10 @@ impl Position {
                 let size_y = piece.len();
                 for x in 0..(BOARD_WIDTH - size_x + 1) {
                     for y in (0..(BOARD_HEIGHT - size_y + 1)).rev() {
+                        let is_open_air =
+                            !check_collision(&open_air_mask, piece, x as i32, y as i32);
                         if is_lock_fast(&self.board, piece, x, y, size_x, size_y) {
-                            if check_collision(&open_air_mask, piece, x as i32, y as i32) {
+                            if !is_open_air {
                                 if self.pathfind_open_air(
                                     &open_air_mask,
                                     piece_color as usize - 1,
@@ -589,7 +605,7 @@ impl Position {
                             } else {
                                 piece_legal_moves.push((piece_color, x, y, rot));
                             }
-                        } else if !check_collision(&open_air_mask, piece, x as i32, y as i32) {
+                        } else if is_open_air {
                             break;
                         }
                     }
@@ -721,22 +737,6 @@ impl Position {
             new_hash,
         ));
     }
-
-    pub fn piece_array(&self, exclusive: bool) -> ArrayVec<Color, 6> {
-        let mut res = ArrayVec::new();
-
-        if exclusive {
-            for color_idx in 1..=PIECE_NUMBER as u8 {
-                if color_idx != self.last_piece as u8 {
-                    res.push(Color::from(color_idx));
-                }
-            }
-        } else {
-            res.push(self.current_piece);
-        }
-
-        res
-    }
 }
 
 impl Default for Position {
@@ -757,18 +757,13 @@ impl Default for Position {
 
 impl Distribution<Color> for Position {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Color {
-        let next_piece = rng.gen_range(1..8);
+        let roll = rng.gen_range(1..9);
 
-        if next_piece == self.next_piece as u8 {
+        if roll == self.next_piece as u8 || roll == 8 {
             let reroll = rng.gen_range(1..7);
-
-            if reroll < next_piece {
-                Color::from(reroll)
-            } else {
-                Color::from(reroll + 1)
-            }
+            Color::from(reroll)
         } else {
-            Color::from(next_piece)
+            Color::from(roll)
         }
     }
 }
