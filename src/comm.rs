@@ -1,12 +1,18 @@
 use std::{io, str::FromStr, time::Instant};
 
 use serde::{Deserialize, Serialize};
+use lazy_static::lazy_static;
+use std::sync::Mutex;
 
 use crate::{
     net::FeedForwardNetwork,
     pos::{Action, Position},
     search::Search,
 };
+
+// lazy_static! {
+//     pub static ref POSITION_HISTORY: Mutex<Vec<String>> = Mutex::new(Vec::new());
+// }
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
@@ -45,7 +51,6 @@ pub fn start() -> io::Result<()> {
     let stdin = io::stdin(); // We get `Stdin` here.
     let mut pos: Position = Position::default();
     let mut net: Option<FeedForwardNetwork> = None;
-    let mut total_moves = 0;
     let mut search = Search::new();
 
     loop {
@@ -72,18 +77,21 @@ pub fn start() -> io::Result<()> {
             In::Pos { tpn } => {
                 // TODO: Clean error handling
                 pos = Position::from_str(&tpn).unwrap();
-                total_moves = 0;
             }
             In::Go => {
                 if let Some(nn) = &mut net {
                     let start = Instant::now();
-                    let (best, action_list) = search.run(nn, &pos);
-                    pos = pos
-                        .apply_move(pos.current_piece, best.0, best.1, best.2, true)
-                        .unwrap();
-                    let end = Instant::now();
-                    eprintln!("Thinking time: {}", (end - start).as_millis());
-                    send(&Out::Move { action_list })?;
+
+                    match search.run(nn, &pos) {
+                        Some((best, action_list)) => {
+                            pos = pos
+                                .apply_move(pos.current_piece, best.0, best.1, best.2, true);
+                            let end = Instant::now();
+                            eprintln!("Thinking time: {}", (end - start).as_millis());
+                            send(&Out::Move { action_list })?;
+                        },
+                        None => send(&Out::GameResult { score: pos.score })?
+                    }
                 }
             }
             In::Peek => {
@@ -96,19 +104,15 @@ pub fn start() -> io::Result<()> {
             }
             In::PlayGame => {
                 if let Some(nn) = &mut net {
-                    let (mut best, _) = search.run(nn, &pos);
-                    while let Some(new_pos) =
-                        pos.apply_move(pos.current_piece, best.0, best.1, best.2, true)
-                    {
-                        if total_moves <= 500 {
-                            pos = new_pos;
-                            best = search.run(nn, &pos).0;
-                            total_moves += 1;
-                        } else {
-                            break;
+                    for _ in 0..1000 {
+                        match search.run(nn, &pos) {
+                            Some((mv, _)) => {
+                                pos = pos.apply_move(pos.current_piece, mv.0, mv.1, mv.2, true);
+                                // POSITION_HISTORY.lock().unwrap().push(pos.to_string());
+                            },
+                            None => break
                         }
                     }
-
                     send(&Out::GameResult { score: pos.score })?;
                     pos = Position::default();
                 };

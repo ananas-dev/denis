@@ -10,6 +10,8 @@ use std::{
     str::FromStr,
 };
 
+use crate::comm;
+
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 22;
 const PIECE_NUMBER: usize = 7;
@@ -348,6 +350,7 @@ pub struct Position {
     pub next_piece: Color,
     pub board: Board<Color>,
     pub hash: u64,
+    pub min_y: usize,
 }
 
 impl Position {
@@ -358,6 +361,7 @@ impl Position {
         score: i64,
         board: Board<Color>,
         hash: u64,
+        min_y: usize,
     ) -> Self {
         Position {
             last_piece,
@@ -366,6 +370,7 @@ impl Position {
             score,
             board,
             hash,
+            min_y,
         }
     }
 
@@ -478,13 +483,128 @@ impl Position {
             if let Some(mv) = mv {
                 path.push(mv.action);
             }
-            mv = *came_from.get(&current).unwrap();
+
+            match came_from.get(&current) {
+                Some(&m) => mv = m,
+                None => {
+                    eprintln!("Move {:?} [{}] on {}", goal, self.min_y, self);
+                    // eprintln!("{:?}", comm::POSITION_HISTORY.lock().unwrap());
+                    panic!()
+                }
+            }
+
             current = mv.unwrap().dest;
         }
 
         path.reverse();
 
         path
+    }
+
+    fn path_reverse(
+        &self,
+        piece: Color,
+        start: (i32, i32, i32),
+        frontier: &mut BinaryHeap<OrderedMove>,
+    ) -> bool {
+        let rot_num = ROTATION_OFFSETS[piece as usize - 1].len() as i32;
+
+        let goal = SPAWNS[piece as usize - 1];
+        let start_move = OrderedMove::new(Move::new(Action::None, start), 0);
+
+        frontier.push(start_move);
+
+        let mut came_from = FxHashMap::default();
+        let mut cost_so_far = FxHashMap::default();
+        came_from.insert(start, None);
+        cost_so_far.insert(start, 0);
+
+        while !frontier.is_empty() {
+            let current = frontier.pop().unwrap().mv;
+            let dest = current.dest;
+
+            if dest == goal {
+                return true;
+            }
+
+            let mut piece = &PIECES[self.current_piece as usize - 1]
+                [wrap_rot(current.dest.2, rot_num) as usize];
+
+            let mut move_list: ArrayVec<Move, 5> = ArrayVec::new();
+
+            if !check_collision(&self.board, piece, dest.0 - 1, dest.1) {
+                move_list.push(Move::new(Action::MoveRight, (dest.0 - 1, dest.1, dest.2)));
+            }
+
+            if !check_collision(&self.board, piece, dest.0 + 1, dest.1) {
+                move_list.push(Move::new(Action::MoveLeft, (dest.0 + 1, dest.1, dest.2)));
+            }
+
+            if !check_collision(&self.board, piece, dest.0, dest.1 - 1) {
+                move_list.push(Move::new(Action::SoftDrop, (dest.0, dest.1 - 1, dest.2)));
+            }
+
+            let mut rot = wrap_rot(dest.2 - 1, rot_num) as usize;
+            let mut rot_offset = ROTATION_OFFSETS[self.current_piece as usize - 1][rot];
+
+            piece = &PIECES[self.current_piece as usize - 1][rot];
+
+            if !check_collision(
+                &self.board,
+                piece,
+                dest.0 - rot_offset.0,
+                dest.1 - rot_offset.1,
+            ) {
+                move_list.push(Move::new(
+                    Action::RotateClockwise,
+                    (
+                        dest.0 - rot_offset.0,
+                        dest.1 - rot_offset.1,
+                        wrap_rot(dest.2 - 1, rot_num),
+                    ),
+                ));
+            }
+
+            rot = wrap_rot(dest.2 + 1, rot_num) as usize;
+            rot_offset = ROTATION_OFFSETS[self.current_piece as usize - 1][dest.2 as usize];
+            piece = &PIECES[self.current_piece as usize - 1][rot];
+
+            if !check_collision(
+                &self.board,
+                piece,
+                dest.0 + rot_offset.0,
+                dest.1 + rot_offset.1,
+            ) {
+                move_list.push(Move::new(
+                    Action::RotateCounterclockwise,
+                    (
+                        dest.0 + rot_offset.0,
+                        dest.1 + rot_offset.1,
+                        wrap_rot(dest.2 + 1, rot_num),
+                    ),
+                ));
+            }
+
+            for &next in move_list.iter() {
+                // Lower costs to higher actions
+                let c = match next.action {
+                    Action::SoftDrop => 1,
+                    _ => next.dest.1 + 1,
+                };
+
+                let new_cost = cost_so_far.get(&current.dest).unwrap() + c;
+                if !cost_so_far.contains_key(&next.dest)
+                    || new_cost < *cost_so_far.get(&next.dest).unwrap()
+                {
+                    cost_so_far.insert(next.dest, new_cost);
+                    let priority = new_cost + proximity(goal, next.dest, rot_num);
+                    frontier.push(OrderedMove::new(next, priority));
+                    came_from.insert(next.dest, Some(current));
+                }
+            }
+        }
+
+        false
     }
 
     fn pathfind_open_air(
@@ -558,6 +678,7 @@ impl Position {
         let mut legal_moves = ArrayVec::new();
         let mut open_air_mask = [[Mask::Set; BOARD_WIDTH]; BOARD_HEIGHT];
         let mut cache = FxHashSet::default();
+        let mut frontier_cache = BinaryHeap::new();
 
         for x in 0..BOARD_WIDTH {
             let mut y = 0;
@@ -567,8 +688,6 @@ impl Position {
                 y += 1;
             }
         }
-
-        eprintln!("{:#?}", open_air_mask);
 
         // Weird but works for the time being
         let piece_list = if self.current_piece == Color::Random {
@@ -591,7 +710,16 @@ impl Position {
                         let is_open_air =
                             !check_collision(&open_air_mask, piece, x as i32, y as i32);
                         if is_lock_fast(&self.board, piece, x, y, size_x, size_y) {
-                            if !is_open_air {
+                            if self.min_y < 4 {
+                                if self.path_reverse(
+                                    piece_color,
+                                    (x as i32, y as i32, rot as i32),
+                                    &mut frontier_cache,
+                                ) {
+                                    piece_legal_moves.push((piece_color, x, y, rot));
+                                }
+                                frontier_cache.clear();
+                            } else if !is_open_air {
                                 if self.pathfind_open_air(
                                     &open_air_mask,
                                     piece_color as usize - 1,
@@ -664,7 +792,7 @@ impl Position {
         y: usize,
         rot: usize,
         gen_next: bool,
-    ) -> Option<Position> {
+    ) -> Position {
         let piece = &PIECES[piece_color as usize - 1][rot];
         let size_x = piece[0].len();
         let size_y = piece.len();
@@ -672,6 +800,8 @@ impl Position {
         let mut new_board = self.board.clone();
         let mut new_score = self.score;
         let mut new_hash = self.hash;
+
+        let mut new_min_y = self.min_y.min(y);
 
         // Place the piece
         for i in 0..size_x {
@@ -708,6 +838,15 @@ impl Position {
                         new_board[y + 1][x] = piece_type;
                     }
                 }
+
+                // Clear the top line
+                // TODO: Test hashing
+                for x in 0..BOARD_WIDTH {
+                    if new_board[0][x] != Color::Empty {
+                        new_board[0][x] = Color::Empty;
+                        new_hash ^= ZOBRISTS[0][x];
+                    }
+                }
             }
         }
 
@@ -719,14 +858,9 @@ impl Position {
             _ => 0,
         };
 
-        // Check game over
-        for i in 0..BOARD_WIDTH {
-            if !new_board[0][i].is_empty() || !new_board[1][i].is_empty() {
-                return None;
-            }
-        }
+        new_min_y += line_count;
 
-        return Some(Position::new(
+        return Position::new(
             piece_color,
             self.next_piece,
             if gen_next {
@@ -737,7 +871,8 @@ impl Position {
             new_score,
             new_board,
             new_hash,
-        ));
+            new_min_y,
+        );
     }
 }
 
@@ -753,6 +888,7 @@ impl Default for Position {
             score: 0,
             hash: hash_board(&board),
             board,
+            min_y: BOARD_HEIGHT - 1,
         }
     }
 }
@@ -824,6 +960,9 @@ impl FromStr for Position {
         let next_piece_tok = tokens[2];
         let score_tok = tokens[3];
 
+        let mut min_y_found = false;
+        let mut min_y = 0;
+
         for x in board_tok.chars() {
             match x {
                 '/' => {
@@ -831,6 +970,10 @@ impl FromStr for Position {
                     curr_y += 1;
                 }
                 '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {
+                    if !min_y_found {
+                        min_y = curr_y;
+                        min_y_found = true;
+                    }
                     curr_x += (x as usize) - ('0' as usize)
                 }
                 _ => {
@@ -853,6 +996,7 @@ impl FromStr for Position {
             score,
             board,
             hash,
+            min_y,
         ))
     }
 }
@@ -887,7 +1031,7 @@ fn is_lock_fast(
     size_y: usize,
 ) -> bool {
     if y == BOARD_HEIGHT - size_y {
-        return true;
+        return !check_collision(board, piece, x as i32, y as i32);
     }
 
     let mut is_lock = false;

@@ -14,11 +14,11 @@ train = False
 ##########################
 ### NEAT CONFIGURATION ###
 
-pop_size = 16
+pop_size = 30
 fitness_threshold = 1000
-num_inputs = 4
+num_inputs = 3
 num_outputs = 1 # Score based on the 7 inputs
-num_generations = 1000000
+num_generations = 1
 
 ##########################
 ##########################
@@ -76,7 +76,9 @@ def eval_genome(genome, config):
         cleaned_node_evals.append((a, b, c, d))
 
     play_engine.load(net.input_nodes, net.output_nodes, cleaned_node_evals)
-    return play_engine.play_game()
+    res = play_engine.play_game()
+    play_engine.terminate()
+    return res
 
 def load_genome(genome_path):
         config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
@@ -101,16 +103,16 @@ def run(config_file, retrain=False):
     
     else:
         # Load the last checkpoint
-        checkpoints_filenames = [filename for filename in os.listdir(".") if filename.startswith("neat-checkpoint-99")]
+        checkpoints_filenames = [filename for filename in os.listdir(".") if filename.startswith("neat-checkpoint-199")]
         checkpoints_filenames.sort()
         filename = checkpoints_filenames[-1]
         p = neat.Checkpointer.restore_checkpoint(filename)
     
     p.add_reporter(neat.StdOutReporter(True))
     p.add_reporter(neat.StatisticsReporter())
-    p.add_reporter(neat.Checkpointer(500, None)) # Saves the model every two generations
+    p.add_reporter(neat.Checkpointer(100, None)) # Saves the model every two generations
 
-    evaluator = neat.ParallelEvaluator(16, eval_genome)
+    evaluator = neat.ParallelEvaluator(15, eval_genome)
 
     winner = p.run(evaluator.evaluate, num_generations) # Runs the population 'number_generations' generations
     pickle.dump(winner, open('winner.pkl', 'wb')) # Saves the best genome
@@ -119,7 +121,7 @@ if __name__ == "__main__":
     modify_config_file()
     # Tests on a game
     if not train: 
-        net = load_genome("nes-strong-2.pkl")
+        net = load_genome("winner.pkl")
         # Tests the best genome on a test game
         play_engine = engine.Engine("./target/release/neat-tetris")
 
@@ -134,9 +136,12 @@ if __name__ == "__main__":
 
         board = np.array(pos.board)
 
-        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (211,211,211), board, 100)
+        graphic = graphics.Graphic(300, (0, 0, 0), (0, 0, 0), (211,211,211), board, fps=200000)
         while True:
             move = play_engine.go()
+
+            if move["type"] == "GameResult": 
+                break;
 
             action_list = move["action_list"]
 
@@ -153,10 +158,10 @@ if __name__ == "__main__":
             pos = play_engine.peek()
 
         print("Game over !")
-        print("Score :", t.score)
+        print("Score :", move["score"])
 
         play_engine.terminate()
 
     # Trains the model
     else:
-        run("config.txt", retrain=False)
+        run("config.txt", retrain=True)

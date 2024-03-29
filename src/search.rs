@@ -21,16 +21,18 @@ impl Search {
         &mut self,
         net: &mut FeedForwardNetwork,
         pos: &Position,
-    ) -> ((usize, usize, usize), Vec<Action>) {
-        let mut best_move = (0, 0, 0);
-        for depth in 2..4 {
+    ) -> Option<((usize, usize, usize), Vec<Action>)> {
+        let mut best_move = None;
+        for depth in 2..3 {
             best_move = self.search_root(net, depth, pos);
         }
 
-        (
+        let best_move = best_move?;
+
+        Some((
             best_move,
             pos.path((best_move.0 as i32, best_move.1 as i32, best_move.2 as i32)),
-        )
+        ))
     }
 
     fn search_root(
@@ -38,18 +40,17 @@ impl Search {
         net: &mut FeedForwardNetwork,
         depth: usize,
         pos: &Position,
-    ) -> (usize, usize, usize) {
+    ) -> Option<(usize, usize, usize)> {
         let mut maxscore = -f64::INFINITY;
-        let mut best_move = (0, 0, 0);
+        let mut best_move = None;
 
         for &(p, x, y, rot) in pos.legal_moves()[0].iter() {
-            if let Some(pos) = pos.apply_move(p, x, y, rot, false) {
-                let score = self.search(net, pos, depth - 1);
+            let pos = pos.apply_move(p, x, y, rot, false);
+            let score = self.search(net, pos, depth - 1);
 
-                if score > maxscore {
-                    maxscore = score;
-                    best_move = (x, y, rot);
-                }
+            if score > maxscore {
+                maxscore = score;
+                best_move = Some((x, y, rot));
             }
         }
 
@@ -63,16 +64,15 @@ impl Search {
             } else {
                 let features = pos.features();
 
-                let score = features.aggregate_height * -0.510066
-                    + features.holes * -0.35663
-                    + features.bumpiness * -0.184483;
+                // let score = features.aggregate_height * -0.510066
+                //     + features.holes * -0.35663
+                //     + features.bumpiness * -0.184483;
 
-                // let score = net.activate(vec![
-                //     0.,
-                //     features.holes,
-                //     features.bumpiness,
-                //     features.aggregate_height,
-                // ])[0];
+                let score = net.activate(vec![
+                    features.holes,
+                    features.bumpiness,
+                    features.aggregate_height,
+                ])[0];
 
                 self.tt.set(pos.hash, score);
 
@@ -83,15 +83,20 @@ impl Search {
         let mut maxscore = 0.;
         let piece_list = pos.legal_moves();
         for piece_moves in piece_list {
-            let mut piece_maxscore = -f64::INFINITY;
-            let piece_color = piece_moves[0].0;
-            for (p, x, y, rot) in piece_moves {
-                if let Some(pos) = pos.apply_move(p, x, y, rot, false) {
-                    let score = self.search(net, pos, depth - 1);
+            if piece_moves.is_empty() {
+                continue;
+            }
 
-                    if score > piece_maxscore {
-                        piece_maxscore = score;
-                    }
+            let mut piece_maxscore = -f64::INFINITY;
+
+            let piece_color = piece_moves[0].0;
+
+            for (p, x, y, rot) in piece_moves {
+                let pos = pos.apply_move(p, x, y, rot, false);
+                let score = self.search(net, pos, depth - 1);
+
+                if score > piece_maxscore {
+                    piece_maxscore = score;
                 }
             }
 

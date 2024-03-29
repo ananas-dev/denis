@@ -38,8 +38,9 @@ class Engine:
         response = self.receive_message()
         return response["score"]
 
-    def pos(self, pos):
-        assert False, "Out of date"
+    def pos(self, tpn):
+        msg = { "type": "Pos", "tpn": tpn }
+        self.send_message(msg)
 
     def go(self):
         msg = { "type": "Go" }
@@ -59,5 +60,5 @@ class Engine:
         self.send_message(msg)
         return self.receive_message()
 
-    def __del__(self):
+    def terminate(self):
         self.process.terminate()
