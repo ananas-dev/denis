@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::{
     cmp::{self, Ordering},
     collections::BinaryHeap,
-    fmt, iter,
+    fmt::{self, Debug},
     str::FromStr,
 };
 
@@ -234,7 +234,7 @@ impl Cell for Color {
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Mask {
     Unset,
     Set,
@@ -432,8 +432,8 @@ impl Position {
                 ));
             }
 
-            rot = wrap_rot(dest.2, rot_num) as usize;
-            rot_offset = ROTATION_OFFSETS[self.current_piece as usize - 1][rot];
+            rot = wrap_rot(dest.2 + 1, rot_num) as usize;
+            rot_offset = ROTATION_OFFSETS[self.current_piece as usize - 1][dest.2 as usize];
             piece = &PIECES[self.current_piece as usize - 1][rot];
 
             if !check_collision(
@@ -567,6 +567,8 @@ impl Position {
                 y += 1;
             }
         }
+
+        eprintln!("{:#?}", open_air_mask);
 
         // Weird but works for the time being
         let piece_list = if self.current_piece == Color::Random {
