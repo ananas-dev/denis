@@ -23,7 +23,7 @@ impl Search {
         pos: &Position,
     ) -> Option<((usize, usize, usize), Vec<Action>)> {
         let mut best_move = None;
-        for depth in 2..3 {
+        for depth in 2..4 {
             best_move = self.search_root(net, depth, pos);
         }
 

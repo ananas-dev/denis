@@ -2,3 +2,4 @@ numpy
 pyautogui
 pygame
 Pillow
+neat-python

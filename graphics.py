@@ -233,7 +233,7 @@ class Graphic():
 
 
     def show_score(self):
-        score_text = self.font.render(f'{self.score:012}', True, self.grid_color)
+        score_text = self.font.render(f'{self.score:012}', True, (255, 255, 255))
         pos = ((self.num_columns + 0.8)*self.block_width, 5)
         self.display.blit(score_text, pos)
         
